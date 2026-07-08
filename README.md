@@ -1,7 +1,7 @@
 # ASHA Mitra (आशा मित्र)
 ### AI-Powered Voice Triage Assistant for ASHA Workers
 ---
-the demo proptotype is live at 
+the demo proptotype is live at https://asha-mitra.vercel.app/
 ---
 ## 🚨 The Problem
 
