@@ -1,42 +1,492 @@
-# ASHA Mitra (आशा मित्र)
-### AI-Powered Voice Triage Assistant for ASHA Workers
----
-the demo proptotype is live at https://asha-mitra.vercel.app/
----
-## 🚨 The Problem
+# ASHA Mitra (आशा मित्र) - AI-Powered Voice Triage Assistant for ASHA Workers
 
-India’s rural healthcare system relies heavily on **ASHA (Accredited Social Health Activist) workers**—grassroots community health volunteers who serve as the critical first point of contact between remote villages and the formal health system. However, these workers face a dangerous infrastructure gap: **they have no structured, clinical decision-support tools to instantly assess how urgent a patient's condition is.** 
+## Overview
 
-This leads to several systemic crisis dimensions:
-* **The Triage Gap:** Without an objective framework, a child with life-threatening anemia and a child with a common temporary fever often receive the exact same verbal referral timeline, leading to preventable maternal and infant mortality
-* **Language & Literacy Barriers:** ASHA workers are expected to make critical, life-saving health decisions but must navigate complex clinical protocols while operating in dozens of regional languages and dialects with zero English literacy requirements
-* **Severe Connectivity Issues:** Most Tier 3/4 villages in India operate on spotty 2G networks or suffer from complete blackout zones, rendering standard cloud-based medical applications completely useless
-* **Paper-Based Vulnerability:** Patient health histories are manually recorded in physical paper registers that are easily lost, damaged, or completely unverified when the patient finally arrives at a referral hospital. ASHA workers often face situations where their clinical assessments are questioned or altered, offering them zero legal protection
+ASHA Mitra is an AI-powered, offline-first Progressive Web Application (PWA) built to empower ASHA (Accredited Social Health Activist) workers in rural India with instant clinical decision support. It acts as an intelligent digital companion that enables healthcare workers to assess patient conditions using voice, classify medical urgency, generate digital referrals, and securely verify records using blockchain technology.
+
+The platform addresses challenges such as poor connectivity, language barriers, paper-based record management, and lack of structured triage systems in rural healthcare.
 
 ---
 
-## 💡 Our Solution: How We Solve It
+## Live Demo
 
-**ASHA Mitra** is an offline-first, voice-driven Progressive Web App (PWA) designed to act as an intelligent, humanistic digital companion for ASHA workers[cite: 1]. It turns any standard Android smartphone into a clinical decision-support ecosystem—operating entirely without an internet connection
-
-Here is exactly how the system solves the crisis on the ground:
-
-### 1. Voice-First Multilingual Intake (Zero Typing)
-Instead of forcing low-literacy users to type complex medical terms, the worker simply opens the app and speaks conversationally in her native language (supporting Hindi, Marathi, Telugu, Tamil, and up to 12+ regional languages)
-
-### 2. On-Device AI & Clinical Triage
-The app utilizes optimized, on-device Speech-to-Text (STT) and local clinical knowledge bases to process the symptom description completely offline[cite: 1]. It instantly classifies the condition and assigns a strict, color-coded **Triage Urgency Level**
-* 🔴 **RED (Critical / Immediate):** Generates an emergency referral and automated alert
-* 🟡 **YELLOW (Moderate / Refer Soon):** Recommends formal hospital evaluation within 24–48 hours
-* 🟢 **GREEN (Low Urgency / Monitor):** Recommends safe home care with localized follow-up instructions
-
-### 3. One-Tap Digital Referrals
-The app auto-generates a structured digital referral slip containing the timestamp, recorded symptoms, and clinical priority level[cite: 1]. The ASHA worker can share this slip directly with Auxiliary Nurse Midwives (ANMs) or Primary Health Centers (PHCs) via WhatsApp with a single tap
-
-### 4. Tamper-Proof Blockchain Verification
-To completely eliminate paper loss and protect the institutional trust of grassroots workers, ASHA Mitra generates a cryptographic hash (SHA-256) of every single triage record[cite: 1]. As soon as the device detects a cellular network or baseline internet connection, this hash is permanently anchored onto the **Polygon Blockchain**
-* **Privacy First:** Only the anonymous hash and timestamp are uploaded, keeping sensitive patient data safe
-* **Immutable Proof:** This gives the ASHA worker undeniable, legally verifiable proof that she made the right assessment at the exact recorded time, protecting her from shifting liability
+🔗 https://asha-mitra.vercel.app/
 
 ---
-*Developed for **BuildForGood 2026** | Theme: **SWASTHYA (स्वास्थ्य)** — Rural & Remote Healthcare Access.
+
+# Problem Statement
+
+India's rural healthcare system depends heavily on ASHA workers who often serve as the first point of medical contact. However, they face several critical challenges:
+
+- No standardized clinical decision-support system
+- Manual paper-based patient records
+- Poor internet connectivity in remote villages
+- Multiple regional languages and literacy barriers
+- Lack of legal proof of patient assessment
+- Delayed identification of emergency cases
+
+These limitations often result in delayed referrals, inconsistent assessments, and preventable maternal and infant mortality.
+
+---
+
+# Solution
+
+ASHA Mitra provides an AI-assisted healthcare ecosystem that works even in offline environments.
+
+The application enables ASHA workers to:
+
+- Record patient symptoms using voice
+- Perform AI-powered clinical triage
+- Generate digital referral slips
+- Securely store patient records
+- Verify assessments using blockchain
+- Continue working without internet connectivity
+
+---
+
+# Features
+
+## Voice-Based Patient Intake
+
+- Voice-first interface
+- No typing required
+- Native language support
+- Speech-to-Text processing
+- Simple conversational interaction
+
+Supported Languages
+
+- Hindi
+- Marathi
+- Tamil
+- Telugu
+- English
+- Additional regional languages (planned)
+
+---
+
+## AI Clinical Triage
+
+The application analyzes symptoms and classifies patient urgency into three categories.
+
+### 🔴 RED
+
+- Critical Condition
+- Immediate Referral Required
+- Emergency Alert
+
+### 🟡 YELLOW
+
+- Moderate Risk
+- Hospital Visit within 24–48 Hours
+
+### 🟢 GREEN
+
+- Low Risk
+- Home Care Instructions
+- Scheduled Follow-up
+
+---
+
+## Digital Referral System
+
+- Auto-generated referral slips
+- Timestamped reports
+- Structured symptom summary
+- Triage priority included
+- One-tap WhatsApp sharing
+- Hospital-ready referral document
+
+---
+
+## Offline-First Architecture
+
+- Works without internet
+- Local data storage
+- Offline AI inference
+- Synchronizes automatically once internet is available
+- Progressive Web App (PWA)
+
+---
+
+## Blockchain Verification
+
+Every patient triage record is cryptographically verified.
+
+Features include:
+
+- SHA-256 hashing
+- Polygon Blockchain integration
+- Immutable timestamp verification
+- Tamper-proof audit trail
+- Privacy-preserving architecture
+- No patient data stored on-chain
+
+---
+
+## Patient Record Management
+
+- Digital patient history
+- Local encrypted storage
+- Referral history
+- Previous consultations
+- Follow-up tracking
+
+---
+
+## Healthcare Dashboard
+
+- Daily patient count
+- Emergency case tracking
+- Referral statistics
+- Pending follow-ups
+- Recent patient activity
+
+---
+
+# User Roles
+
+## ASHA Worker
+
+- Record patient symptoms
+- Perform voice-based triage
+- Generate referrals
+- Access patient history
+- Track follow-ups
+
+---
+
+## ANM / PHC Staff
+
+- View digital referrals
+- Verify patient assessments
+- Access referral history
+- Continue treatment workflow
+
+---
+
+## Administrator
+
+- Manage healthcare workers
+- Monitor analytics
+- Configure language support
+- Manage healthcare facilities
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- React.js
+- Tailwind CSS
+- Vite
+- Progressive Web App (PWA)
+
+---
+
+## Backend
+
+- Node.js
+- Express.js
+- REST API
+
+---
+
+## AI & Machine Learning
+
+- Speech-to-Text (STT)
+- AI-based Clinical Triage Engine
+- Local Inference Models
+- Multilingual NLP
+
+---
+
+## Database
+
+- PostgreSQL
+---
+
+## Blockchain
+
+- Polygon
+- SHA-256 Hashing
+- Immutable Verification
+
+---
+
+## Tools
+
+- Prisma ORM
+- Postman
+- Git
+- GitHub
+- VS Code
+
+---
+
+# Project Architecture
+
+```text
+ASHA Worker
+
+      │
+
+ Voice Input
+
+      │
+
+Speech-to-Text Engine
+
+      │
+
+AI Clinical Triage Engine
+
+      │
+
+Generate Referral
+
+      │
+
+Store Patient Record
+
+      │
+
+SHA-256 Hash Generation
+
+      │
+
+Polygon Blockchain
+
+      │
+
+Healthcare Dashboard
+```
+
+---
+
+# Core Modules
+
+- Authentication
+- Voice Processing
+- AI Triage Engine
+- Patient Management
+- Referral Generation
+- Blockchain Verification
+- Offline Synchronization
+- Healthcare Dashboard
+- Notification System
+
+---
+
+# Folder Structure
+
+```text
+ASHA-Mitra/
+
+├── client/
+│   ├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── hooks/
+│   ├── services/
+│   └── utils/
+│
+├── server/
+│   ├── controllers/
+│   ├── routes/
+│   ├── middleware/
+│   ├── services/
+│   ├── prisma/
+│   ├── blockchain/
+│   ├── ai/
+│   ├── config/
+│   └── server.js
+│
+├── README.md
+└── package.json
+```
+
+---
+
+# Core Workflows
+
+## Voice-Based Triage
+
+```text
+Open App
+     ↓
+Speak Symptoms
+     ↓
+Speech-to-Text
+     ↓
+AI Analysis
+     ↓
+Assign Triage Level
+     ↓
+Display Recommendation
+```
+
+---
+
+## Referral Workflow
+
+```text
+Patient Assessment
+        ↓
+AI Classification
+        ↓
+Generate Referral Slip
+        ↓
+Share via WhatsApp
+        ↓
+Hospital Receives Referral
+```
+
+---
+
+## Blockchain Verification
+
+```text
+Patient Record
+      ↓
+Generate SHA-256 Hash
+      ↓
+Store Record Locally
+      ↓
+Internet Available
+      ↓
+Upload Hash to Polygon
+      ↓
+Immutable Verification
+```
+
+---
+
+# Security Features
+
+- JWT Authentication
+- Secure Password Hashing
+- End-to-End Encryption
+- SHA-256 Record Hashing
+- Blockchain Verification
+- Privacy-First Architecture
+- Offline Secure Storage
+- Role-Based Access Control
+
+---
+
+# Future Enhancements
+
+- OCR for Medical Documents
+- AI-powered Disease Prediction
+- Wearable Device Integration
+- Telemedicine Support
+- Electronic Health Records (EHR)
+- SMS Alerts
+- GPS-enabled Emergency Routing
+- Regional Language Expansion
+- Maternal Health Monitoring
+- Child Vaccination Tracking
+
+---
+
+# Installation
+
+## Clone Repository
+
+```bash
+git clone https://github.com/your-username/asha-mitra.git
+
+cd asha-mitra
+```
+
+## Install Backend
+
+```bash
+cd server
+
+npm install
+```
+
+## Install Frontend
+
+```bash
+cd client
+
+npm install
+```
+
+## Configure Environment Variables
+
+```env
+DATABASE_URL=
+
+JWT_SECRET=
+
+POLYGON_RPC_URL=
+
+PRIVATE_KEY=
+
+PORT=5000
+```
+
+## Start Backend
+
+```bash
+npm run dev
+```
+
+## Start Frontend
+
+```bash
+npm run dev
+```
+
+---
+
+# API Modules
+
+- Authentication
+- Voice Processing
+- Patient Management
+- AI Triage
+- Referral Management
+- Blockchain Verification
+- Notifications
+- Dashboard
+- Healthcare Analytics
+
+---
+
+# Team Responsibilities
+
+| Member | Responsibility |
+|----------|----------------|
+| Frontend Developer | React UI, Voice Interface, PWA, API Integration |
+| Backend Developer | REST APIs, Authentication, Database, AI Integration, Blockchain |
+| AI Developer | Speech-to-Text, NLP, Clinical Triage |
+| Blockchain Developer | Polygon Integration, Hash Verification |
+
+---
+
+# Future Scope
+
+- Nationwide ASHA Deployment
+- Government Health Scheme Integration
+- Hospital Information System Integration
+- AI-assisted Diagnosis
+- Offline LLM Support
+- Digital Health ID Integration (ABHA)
+- Predictive Healthcare Analytics
+- Emergency Ambulance Dispatch
+- Cloud Synchronization
+- Multi-State Language Expansion
+
+---
+
+# License
+
+This project was developed for **BuildForGood 2026** under the **SWASTHYA (स्वास्थ्य) — Rural & Remote Healthcare Access** theme.
+
+Made with ❤️ to empower India's frontline healthcare workers.
