@@ -82,6 +82,11 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [symptoms, setSymptoms] = useState([]);
   const [advice, setAdvice] = useState('');
 
+  // Added states for manual input and verification
+  const [inputMode, setInputMode] = useState('voice'); // 'voice' or 'manual'
+  const [verificationStep, setVerificationStep] = useState(false);
+  const [editableSymptoms, setEditableSymptoms] = useState([]);
+
   // Hashing & Anchoring variables
   const [anchoringLogs, setAnchoringLogs] = useState('');
   const [calculatedHash, setCalculatedHash] = useState('');
@@ -135,6 +140,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       setUrgency(finalPreset.urgency);
       setSymptoms(finalPreset.symptoms);
       setAdvice(finalPreset.advice);
+      // Initialize editableSymptoms for verification
+      setEditableSymptoms(finalPreset.symptoms);
+      setVerificationStep(false);
       setTriageStep('completed');
     }, 2000);
   };
@@ -237,52 +245,89 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           </button>
         </div>
 
+      {/* Input Mode Tabs */}
+      <div className="flex space-x-2 mb-4 px-6 mt-4">
+        <button
+          onClick={() => setInputMode('voice')}
+          className={`px-4 py-2 rounded ${inputMode === 'voice' ? 'bg-[#E07A5F] text-white' : 'bg-gray-200 text-gray-800'}`}
+        >
+          Voice Input
+        </button>
+        <button
+          onClick={() => setInputMode('manual')}
+          className={`px-4 py-2 rounded ${inputMode === 'manual' ? 'bg-[#E07A5F] text-white' : 'bg-gray-200 text-gray-800'}`}
+        >
+          Manual Input
+        </button>
+      </div>
+
         {/* Scrollable Content Container */}
         <div className="p-6 overflow-y-auto flex-grow">
           {triageStep === 'idle' && (
-            <div className="text-center py-8">
-              <div className="max-w-md mx-auto mb-8">
-                <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-3 text-left">
-                  1. Select Spoken Language
-                </label>
-                <div className="relative">
-                  <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                  <select 
-                    value={selectedLanguage}
-                    onChange={(e) => setSelectedLanguage(e.target.value)}
-                    className="w-full min-h-[56px] pl-12 pr-10 rounded-2xl border-2 border-slate-200 bg-white text-lg font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer hover:bg-slate-50 transition-all"
-                  >
-                    {INDIAN_LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.code}>{lang.name}</option>
-                    ))}
-                  </select>
+            <>
+              {/* Voice Input UI */}
+              {inputMode === 'voice' && (
+                <div className="text-center py-8">
+                  <div className="max-w-md mx-auto mb-8">
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-3 text-left">1. Select Spoken Language</label>
+                    <div className="relative">
+                      <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                      <select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value)} className="w-full min-h-[56px] pl-12 pr-10 rounded-2xl border-2 border-slate-200 bg-white text-lg font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer hover:bg-slate-50 transition-all">
+                        {INDIAN_LANGUAGES.map(lang => (
+                          <option key={lang.code} value={lang.code}>{lang.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center justify-center my-6">
+                    <button onClick={startRecording} className="w-24 h-24 rounded-full bg-[#E07A5F] hover:bg-[#D46A4F] text-white flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 group relative">
+                      <div className="absolute inset-0 rounded-full bg-[#E07A5F] opacity-20 animate-ping group-hover:opacity-30"></div>
+                      <Mic className="w-10 h-10" />
+                    </button>
+                    <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-6">Start Voice Triage</h4>
+                    <p className="text-slate-500 mt-2 max-w-sm">Click the microphone, then instruct the patient to describe their symptoms in their native tongue.</p>
+                  </div>
+                  <div className="bg-[#FDFBF7] border border-slate-200 rounded-2xl p-4 mt-6 max-w-md mx-auto text-left">
+                    <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Instructions</h5>
+                    <ul className="text-sm text-slate-600 space-y-1.5 list-disc pl-4">
+                      <li>Hold the phone within 1 foot of the patient's mouth.</li>
+                      <li>Ensure background noise is minimized.</li>
+                      <li>Our AI automatically translates regional dialects to clinical English.</li>
+                    </ul>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex flex-col items-center justify-center my-6">
-                <button 
-                  onClick={startRecording}
-                  className="w-24 h-24 rounded-full bg-[#E07A5F] hover:bg-[#D46A4F] text-white flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 group relative"
-                >
-                  <div className="absolute inset-0 rounded-full bg-[#E07A5F] opacity-20 animate-ping group-hover:opacity-30"></div>
-                  <Mic className="w-10 h-10" />
-                </button>
-                <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-6">Start Voice Triage</h4>
-                <p className="text-slate-500 mt-2 max-w-sm">
-                  Click the microphone, then instruct the patient to describe their symptoms in their native tongue.
-                </p>
-              </div>
-
-              {/* Tips */}
-              <div className="bg-[#FDFBF7] border border-slate-200 rounded-2xl p-4 mt-6 max-w-md mx-auto text-left">
-                <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Instructions</h5>
-                <ul className="text-sm text-slate-600 space-y-1.5 list-disc pl-4">
-                  <li>Hold the phone within 1 foot of the patient's mouth.</li>
-                  <li>Ensure background noise is minimized.</li>
-                  <li>Our AI automatically translates regional dialects to clinical English.</li>
-                </ul>
-              </div>
-            </div>
+              )}
+              {/* Manual Input UI */}
+              {inputMode === 'manual' && (
+                <div className="space-y-4 max-w-md mx-auto">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Spoken Voice (Original)</label>
+                    <textarea value={transcript} onChange={e => setTranscript(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">English Translation (AI)</label>
+                    <textarea value={translation} onChange={e => setTranslation(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Urgency Level</label>
+                    <select value={urgency} onChange={e => setUrgency(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]">
+                      <option value="Green">Green</option>
+                      <option value="Yellow">Yellow</option>
+                      <option value="Red">Red</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Symptoms (one per line)</label>
+                    <textarea value={symptoms.join('\n')} onChange={e => setSymptoms(e.target.value.split('\n').filter(s => s.trim() !== ''))} rows={4} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Advice / Recommendations</label>
+                    <textarea value={advice} onChange={e => setAdvice(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                  </div>
+                  <button onClick={() => { setVerificationStep(false); setEditableSymptoms(symptoms); setTriageStep('completed'); }} className="mt-2 px-4 py-2 bg-[#0A2540] text-white rounded hover:bg-[#123152]">Submit Manual Entry</button>
+                </div>
+              )}
+            </>
           )}
 
           {triageStep === 'recording' && (
@@ -334,6 +379,24 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
           {triageStep === 'completed' && (
             <div className="space-y-6 fade-in-view text-left">
+                {/* Verify Symptoms Button */}
+                {verificationStep ? (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-slate-700">Edit Symptoms (one per line)</label>
+                    <textarea value={editableSymptoms.join('\n')} onChange={e => setEditableSymptoms(e.target.value.split('\n').filter(s => s.trim() !== ''))} rows={4} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                    <button onClick={() => { setVerificationStep(false); setSymptoms(editableSymptoms); }} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Done Editing</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setVerificationStep(true);
+                      setEditableSymptoms(symptoms);
+                    }}
+                    className="mt-4 px-4 py-2 bg-[#0A2540] text-white rounded hover:bg-[#123152]"
+                  >
+                    Verify & Edit Symptoms
+                  </button>
+                )}
               {/* Urgency Classification Header */}
               <div className={`p-5 rounded-2xl flex items-start gap-4 border ${
                 urgency === 'Red' 
