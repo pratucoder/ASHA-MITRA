@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, Languages, Clock, Volume2 } from 'lucide-react';
+import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, Languages, Clock, Volume2, MapPin, Phone, ExternalLink } from 'lucide-react';
 import { generateSHA256, generateTxHash } from '../blockchain/crypto';
+import { getNearbyHospitals, getNearbyHospitalsAsync } from '../utils/hospitals';
 
 const INDIAN_LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -69,7 +70,7 @@ const SYMPTOM_PRESETS = [
   }
 ];
 
-export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriage }) {
+export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriage, userCoords }) {
   const [selectedLanguage, setSelectedLanguage] = useState('hi');
   const [triageStep, setTriageStep] = useState('idle'); // idle, recording, analyzing, completed, anchoring
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -91,6 +92,11 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [anchoringLogs, setAnchoringLogs] = useState('');
   const [calculatedHash, setCalculatedHash] = useState('');
 
+  // Geolocation & Hospital Proximity Recommendations
+  const [gpsState, setGpsState] = useState('idle'); // idle, loading, success, error
+  const [nearbyHospitals, setNearbyHospitals] = useState([]);
+  const [selectedHospital, setSelectedHospital] = useState(null);
+
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -102,9 +108,71 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       setTranslation('');
       setAnchoringLogs('');
       setCalculatedHash('');
+      setSelectedHospital(null);
+      setGpsState('idle');
+      setNearbyHospitals([]);
       if (timerRef.current) clearInterval(timerRef.current);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    let active = true;
+    if (triageStep === 'completed' && urgency === 'Red') {
+      setSelectedHospital(null);
+      if (userCoords) {
+        setGpsState('success');
+        getNearbyHospitalsAsync(userCoords.latitude, userCoords.longitude, patient?.village).then(sortedHosp => {
+          if (active) {
+            setNearbyHospitals(sortedHosp);
+          }
+        });
+      } else {
+        setGpsState('loading');
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              if (active) setGpsState('success');
+              getNearbyHospitalsAsync(latitude, longitude, patient?.village).then(sortedHosp => {
+                if (active) {
+                  setNearbyHospitals(sortedHosp);
+                }
+              });
+            },
+            (error) => {
+              console.warn("Geolocation failed, falling back to village mapping:", error);
+              if (active) setGpsState('error');
+              getNearbyHospitalsAsync(null, null, patient?.village).then(sortedHosp => {
+                if (active) {
+                  setNearbyHospitals(sortedHosp);
+                }
+              });
+            },
+            { timeout: 5000 }
+          );
+        } else {
+          setGpsState('error');
+          getNearbyHospitalsAsync(null, null, patient?.village).then(sortedHosp => {
+            if (active) {
+              setNearbyHospitals(sortedHosp);
+            }
+          });
+        }
+      }
+    }
+    return () => {
+      active = false;
+    };
+  }, [triageStep, urgency, patient?.village, userCoords]);
+
+  const handleSelectHospital = (hosp) => {
+    setSelectedHospital(hosp);
+    const referralSuffix = `\n\n[Referral Destination: ${hosp.name} (Contact: ${hosp.phone})]`;
+    setAdvice(prev => {
+      const cleanAdvice = prev.split('\n\n[Referral Destination:')[0];
+      return cleanAdvice + referralSuffix;
+    });
+  };
 
   const startRecording = () => {
     setTriageStep('recording');
@@ -432,6 +500,95 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   <p className="text-sm mt-1 opacity-80">{advice}</p>
                 </div>
               </div>
+
+              {/* Nearby Emergency Hospitals Card */}
+              {urgency === 'Red' && (
+                <div className="bg-[#FFF5F5] border border-red-200/80 rounded-3xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-red-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-red-600 animate-bounce" />
+                      <h4 className="font-heading font-extrabold text-[#0A2540] text-sm md:text-base">🚨 Emergency Nearby Hospitals</h4>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm border ${
+                      gpsState === 'loading' 
+                        ? 'bg-amber-50 border-amber-200 text-amber-600 animate-pulse' 
+                        : gpsState === 'success' 
+                        ? 'bg-green-50 border-green-200 text-green-700' 
+                        : 'bg-slate-100 border-slate-200 text-slate-600'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        gpsState === 'loading' 
+                          ? 'bg-amber-500 animate-ping' 
+                          : gpsState === 'success' 
+                          ? 'bg-green-500' 
+                          : 'bg-slate-400'
+                      }`}></span>
+                      {gpsState === 'loading' ? 'Locating GPS...' : gpsState === 'success' ? 'GPS Active' : 'Village Fallback'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                    {nearbyHospitals.length === 0 ? (
+                      <div className="text-center py-4 text-xs text-slate-400">Locating regional medical services...</div>
+                    ) : (
+                      nearbyHospitals.map((hosp, idx) => {
+                        const isSelected = selectedHospital?.id === hosp.id;
+                        return (
+                          <div key={hosp.id} className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 text-left ${
+                            isSelected 
+                              ? 'border-red-500 bg-red-50/30 shadow-sm' 
+                              : 'border-slate-100 bg-white hover:border-slate-200'
+                          }`}>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-[#0A2540] text-sm">{hosp.name}</span>
+                                {idx === 0 && (
+                                  <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-wider rounded">
+                                    Nearest
+                                  </span>
+                                )}
+                              </div>
+                              <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded">
+                                {hosp.distance} km away
+                              </span>
+                            </div>
+
+                            <div className="flex gap-1.5 shrink-0 self-start md:self-center">
+                              <a 
+                                href={`tel:${hosp.phone}`}
+                                className="p-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-all border border-green-200 flex items-center justify-center gap-1 text-xs font-bold animate-pulse hover:animate-none"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>Call ER</span>
+                              </a>
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1 text-xs font-bold"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Map</span>
+                              </a>
+                              <button
+                                onClick={() => handleSelectHospital(hosp)}
+                                className={`px-2.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1 border ${
+                                  isSelected 
+                                    ? 'bg-red-600 border-red-600 text-white shadow-sm' 
+                                    : 'bg-white hover:bg-slate-50 text-[#0A2540] border-slate-200 shadow-sm'
+                                }`}
+                              >
+                                {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
+                                {isSelected ? 'Referral Selected' : 'Select for Referral'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Transcripts Card */}
               <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
