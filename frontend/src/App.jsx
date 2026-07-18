@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Activity, Home, Users, History as HistoryIcon, LogOut, ChevronRight, X, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, ExternalLink
+  Activity, Home, Users, History as HistoryIcon, LogOut, ChevronRight, X, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, ExternalLink, Phone, MapPin
 } from 'lucide-react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -9,6 +9,8 @@ import AddPatient from './components/AddPatient';
 import History from './components/History';
 import ANMDashboard from './components/ANMDashboard';
 import VoiceTriageModal from './components/VoiceTriageModal';
+import HospitalsMap from './components/HospitalsMap';
+import { getNearbyHospitals, registerDynamicVillage, reverseGeocode } from './utils/hospitals';
 import './App.css';
 
 // Seed initial history data for ANM Supervisor cluster view
@@ -64,6 +66,16 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // User Real-time Geolocation Coordinates
+  const [userCoords, setUserCoords] = useState(null);
+  const [userLocationName, setUserLocationName] = useState('Locating...');
+
+  // Registered ASHA/ANM workers state
+  const [registeredUsers, setRegisteredUsers] = useState(() => {
+    const saved = localStorage.getItem('asha_registered_users');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // Global UI State
   const [currentView, setCurrentView] = useState('home'); // home, patients, add-patient, history
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -97,6 +109,107 @@ function App() {
   useEffect(() => {
     localStorage.setItem('asha_triage_history', JSON.stringify(triageHistory));
   }, [triageHistory]);
+
+  const lastGeocodedCoordsRef = useRef(null);
+
+  // Request browser location permission & continuously geocode to human-readable area name
+  useEffect(() => {
+    let watchId = null;
+    if (user) {
+      if (navigator.geolocation) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setUserCoords({ latitude, longitude });
+            console.log("Real-time location updated:", latitude, longitude);
+
+            // Fetch human-readable village/city name when coordinates change significantly (~100m)
+            const shiftThreshold = 0.001;
+            const lastCoords = lastGeocodedCoordsRef.current;
+            if (!lastCoords || 
+                Math.abs(latitude - lastCoords.latitude) > shiftThreshold || 
+                Math.abs(longitude - lastCoords.longitude) > shiftThreshold) {
+              
+              lastGeocodedCoordsRef.current = { latitude, longitude };
+              reverseGeocode(latitude, longitude).then(areaName => {
+                if (areaName) {
+                  setUserLocationName(areaName);
+                  // Register the resolved area name dynamically into ROAD_GRAPH
+                  registerDynamicVillage(areaName, latitude, longitude);
+                }
+              });
+            }
+          },
+          (error) => {
+            console.warn("Real-time location watch error:", error);
+            if (user.coordinates) {
+              setUserCoords(user.coordinates);
+              setUserLocationName(user.location || 'Locked Location');
+            }
+          },
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+        );
+      } else if (user.coordinates) {
+        setUserCoords(user.coordinates);
+        setUserLocationName(user.location || 'Locked Location');
+      }
+    } else {
+      setUserCoords(null);
+      setUserLocationName('Locating...');
+      lastGeocodedCoordsRef.current = null;
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [user]);
+
+  // Restore dynamic villages on mount
+  useEffect(() => {
+    const savedVillages = JSON.parse(localStorage.getItem('asha_dynamic_villages') || '[]');
+    savedVillages.forEach(v => {
+      registerDynamicVillage(v.name, v.lat, v.lng);
+    });
+  }, []);
+
+  const handleRegister = (newUserData) => {
+    const newUser = {
+      id: Date.now(),
+      ...newUserData
+    };
+
+    // Register custom village in Dijkstra graph
+    if (newUserData.coordinates) {
+      registerDynamicVillage(newUserData.location, newUserData.coordinates.latitude, newUserData.coordinates.longitude);
+      
+      const savedVillages = JSON.parse(localStorage.getItem('asha_dynamic_villages') || '[]');
+      if (!savedVillages.find(v => v.name.toLowerCase() === newUserData.location.toLowerCase())) {
+        savedVillages.push({
+          name: newUserData.location,
+          lat: newUserData.coordinates.latitude,
+          lng: newUserData.coordinates.longitude
+        });
+        localStorage.setItem('asha_dynamic_villages', JSON.stringify(savedVillages));
+      }
+    }
+
+    setRegisteredUsers(prev => {
+      const updated = [newUser, ...prev];
+      localStorage.setItem('asha_registered_users', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Automatically login the registered user
+    setUser(newUser);
+    localStorage.setItem('token', 'mock-offline-token-' + newUser.id);
+    localStorage.setItem('asha_user', JSON.stringify(newUser));
+    if (newUser.coordinates) {
+      setUserCoords(newUser.coordinates);
+    }
+    showToast('Registered and logged in!', 'success');
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -141,16 +254,20 @@ function App() {
     } catch (err) {
       // Fallback Offline/Demo Auth
       const mockUsers = [
-        { id: 1, phone: '9999900001', name: 'Sunita Devi', role: 'ASHA Worker', location: 'Rampur' },
-        { id: 2, phone: '9999900003', name: 'Dr. Anjali Sharma', role: 'ANM Supervisor', location: 'District Hospital' }
+        { id: 1, phone: '9999900001', password: 'password123', name: 'Sunita Devi', role: 'ASHA Worker', location: 'Rampur' },
+        { id: 2, phone: '9999900003', password: 'password123', name: 'Dr. Anjali Sharma', role: 'ANM Supervisor', location: 'District Hospital' },
+        ...registeredUsers
       ];
-
-      const foundUser = mockUsers.find(u => u.phone === phone && password === 'password123');
+ 
+      const foundUser = mockUsers.find(u => u.phone === phone && u.password === password);
       if (foundUser) {
         setUser(foundUser);
         localStorage.setItem('token', 'mock-offline-token-' + foundUser.id);
         localStorage.setItem('asha_user', JSON.stringify(foundUser));
-        showToast('Logged in (Demo Mode)');
+        if (foundUser.coordinates) {
+          setUserCoords(foundUser.coordinates);
+        }
+        showToast('Logged in (Offline Mode)', 'success');
       } else {
         setError('Invalid phone number or password. Try demo accounts!');
       }
@@ -205,7 +322,7 @@ function App() {
   };
 
   // Stats Counters (specific to worker "Sunita Devi" vs All)
-  const isASHA = user?.role === 'ASHA Worker';
+  const isASHA = user?.role === 'ASHA Worker' || user?.role === 'ASHA';
   const displayHistory = isASHA 
     ? triageHistory.filter(t => t.ashaName === user.name) 
     : triageHistory;
@@ -227,6 +344,7 @@ function App() {
         fillDemo={fillDemo}
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
+        handleRegister={handleRegister}
       />
     );
   }
@@ -308,6 +426,21 @@ function App() {
                   </span>
                   {currentView === 'history' && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
                 </button>
+
+                <button 
+                  onClick={() => setCurrentView('map')}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${
+                    currentView === 'map' 
+                      ? 'bg-[#123152] text-white shadow-inner font-bold' 
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-[#E07A5F]" />
+                    Locate Hospitals
+                  </span>
+                  {currentView === 'map' && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
+                </button>
               </>
             ) : (
               /* ANM Supervisor Sidebar Layout (Single Main Board view) */
@@ -330,6 +463,12 @@ function App() {
           <div>
             <div className="font-bold text-sm text-white">{user.name}</div>
             <div className="text-[10px] uppercase text-[#E07A5F] font-bold tracking-wider">{user.role} · {user.location}</div>
+            {userCoords && (
+              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-300 bg-white/5 px-2.5 py-1 rounded border border-white/5 font-semibold w-fit">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                <span>📍 Live Area: {userLocationName}</span>
+              </div>
+            )}
           </div>
           <button 
             onClick={handleLogout}
@@ -347,9 +486,15 @@ function App() {
           <Activity className="w-5 h-5 text-[#E07A5F]" />
           <span className="font-heading font-extrabold text-md">ASHA Saathi</span>
         </div>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end">
           <span className="text-xs font-bold text-slate-300 block">{user.name}</span>
           <span className="text-[9px] uppercase text-[#E07A5F] font-black">{user.location}</span>
+          {userCoords && (
+            <span className="text-[9px] font-semibold text-slate-300 bg-white/10 px-2 py-0.5 rounded flex items-center gap-1.5 mt-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+              Live Area: {userLocationName}
+            </span>
+          )}
         </div>
       </header>
 
@@ -400,6 +545,14 @@ function App() {
                 setSelectedHistoryItem={setSelectedHistoryItem}
               />
             )}
+
+            {currentView === 'map' && (
+              <HospitalsMap 
+                userCoords={userCoords}
+                userLocationName={userLocationName}
+                onBack={() => setCurrentView('home')}
+              />
+            )}
           </>
         ) : (
           /* ANM Supervisor Render Mode */
@@ -447,6 +600,16 @@ function App() {
           </button>
 
           <button 
+            onClick={() => setCurrentView('map')}
+            className={`flex flex-col items-center justify-center p-1.5 transition-colors ${
+              currentView === 'map' ? 'text-[#E07A5F]' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MapPin className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-1">Map</span>
+          </button>
+
+          <button 
             onClick={handleLogout}
             className="flex flex-col items-center justify-center p-1.5 text-slate-400 hover:text-white transition-colors"
           >
@@ -486,6 +649,7 @@ function App() {
         }}
         patient={triagePatient}
         onSaveTriage={handleSaveTriage}
+        userCoords={userCoords}
       />
 
       {/* Triage Detail Inspector Dialog */}
@@ -581,13 +745,63 @@ function App() {
                     {selectedHistoryItem.urgency === 'Yellow' && <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />}
                     {selectedHistoryItem.urgency === 'Green' && <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />}
                     
-                    <div>
+                     <div>
                       <h4 className="font-bold text-sm">
                         {selectedHistoryItem.urgency} Urgency Classification
                       </h4>
                       <p className="text-xs mt-0.5 opacity-90">{selectedHistoryItem.advice}</p>
                     </div>
                   </div>
+
+                  {/* Nearby Emergency Hospitals */}
+                  {selectedHistoryItem.urgency === 'Red' && (
+                    <div className="bg-[#FFF5F5] border border-red-200/80 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center gap-2 border-b border-red-100 pb-2">
+                        <MapPin className="w-4 h-4 text-red-600 animate-bounce" />
+                        <h5 className="font-bold text-[#0A2540] text-xs uppercase tracking-wider">Nearby Emergency Services</h5>
+                        <span className="text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold ml-auto">
+                          Village: {selectedHistoryItem.village}
+                        </span>
+                      </div>
+                      <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                        {getNearbyHospitals(null, null, selectedHistoryItem.village).map((hosp, idx) => (
+                          <div key={hosp.id} className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between gap-3 text-xs text-left">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-[#0A2540]">{hosp.name}</span>
+                                {idx === 0 && (
+                                  <span className="bg-red-600 text-white text-[8px] font-bold uppercase px-1.5 py-0.2 rounded">
+                                    Nearest
+                                  </span>
+                                )}
+                              </div>
+                              <span className="inline-block bg-slate-50 border border-slate-100 px-1 py-0.2 rounded text-[9px] text-slate-500 font-bold">
+                                {hosp.distance} km away
+                              </span>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <a 
+                                href={`tel:${hosp.phone}`}
+                                className="p-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 flex items-center justify-center gap-1 font-bold text-[10px]"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>Call</span>
+                              </a>
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 flex items-center justify-center gap-1 font-bold text-[10px]"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Map</span>
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Blockchain anchoring panel link */}
                   {selectedHistoryItem.txHash && (
