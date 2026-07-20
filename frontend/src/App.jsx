@@ -459,16 +459,10 @@ function App() {
         </div>
 
         {/* User Card at Sidebar Bottom */}
-        <div className="space-y-4 pt-4 border-t border-white/10">
+        <div className="space-y-3 pt-4 border-t border-white/10 shrink-0">
           <div>
             <div className="font-bold text-sm text-white">{user.name}</div>
-            <div className="text-[10px] uppercase text-[#E07A5F] font-bold tracking-wider">{user.role} · {user.location}</div>
-            {userCoords && (
-              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-300 bg-white/5 px-2.5 py-1 rounded border border-white/5 font-semibold w-fit">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-                <span>📍 Live Area: {userLocationName}</span>
-              </div>
-            )}
+            <div className="text-[10px] uppercase text-[#E07A5F] font-extrabold tracking-wider">{user.role} · {user.location}</div>
           </div>
           <button 
             onClick={handleLogout}
@@ -489,12 +483,6 @@ function App() {
         <div className="text-right flex flex-col items-end">
           <span className="text-xs font-bold text-slate-300 block">{user.name}</span>
           <span className="text-[9px] uppercase text-[#E07A5F] font-black">{user.location}</span>
-          {userCoords && (
-            <span className="text-[9px] font-semibold text-slate-300 bg-white/10 px-2 py-0.5 rounded flex items-center gap-1.5 mt-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-              Live Area: {userLocationName}
-            </span>
-          )}
         </div>
       </header>
 

@@ -6,13 +6,16 @@ export const NODE_COORDINATES = {
   'Pimpri': { latitude: 23.7800, longitude: 80.3200 },
   'Vikas Nagar': { latitude: 23.8100, longitude: 80.3600 },
   'Katni District Hospital': { latitude: 23.8370, longitude: 80.4000 },
-  'Rampur CHC': { latitude: 23.8050, longitude: 80.3450 },
-  'Piparia Rural Hospital': { latitude: 23.8180, longitude: 80.3650 },
+  'Rampur Primary Health Centre (PHC)': { latitude: 23.8050, longitude: 80.3450 },
+  'Piparia Rural Health Clinic': { latitude: 23.8180, longitude: 80.3650 },
   'Apex Multispeciality Hospital': { latitude: 23.8280, longitude: 80.3800 },
-  'Jabalpur Tertiary Referral Hospital': { latitude: 23.1681, longitude: 79.9338 }
+  'Jabalpur Tertiary Referral Hospital': { latitude: 23.1681, longitude: 79.9338 },
+  'Vikas Nagar Wellness Clinic': { latitude: 23.8120, longitude: 80.3580 },
+  'Pimpri Sub-Health Centre': { latitude: 23.7840, longitude: 80.3250 },
+  'Dr. Sharma Family Clinic': { latitude: 23.8250, longitude: 80.3750 }
 };
 
-// Main hospital profiles
+// Regional hospitals and clinic profiles (including small clinics, PHCs, CHCs, doctors)
 export const REGIONAL_HOSPITALS = [
   {
     id: 'hosp-1',
@@ -23,17 +26,17 @@ export const REGIONAL_HOSPITALS = [
   },
   {
     id: 'hosp-2',
-    name: 'Rampur CHC',
+    name: 'Rampur Primary Health Centre (PHC)',
     phone: '+91 76222 23045',
     address: 'Main Road, Rampur Sector 2, MP',
-    type: 'hospital'
+    type: 'clinic'
   },
   {
     id: 'hosp-3',
-    name: 'Piparia Rural Hospital',
+    name: 'Piparia Rural Health Clinic',
     phone: '+91 76222 24590',
     address: 'Piparia Junction Road, MP',
-    type: 'hospital'
+    type: 'clinic'
   },
   {
     id: 'hosp-4',
@@ -44,6 +47,27 @@ export const REGIONAL_HOSPITALS = [
   },
   {
     id: 'hosp-5',
+    name: 'Vikas Nagar Wellness Clinic',
+    phone: '+91 98261 44321',
+    address: 'Block B, Vikas Nagar, Katni, MP',
+    type: 'clinic'
+  },
+  {
+    id: 'hosp-6',
+    name: 'Pimpri Sub-Health Centre',
+    phone: '+91 76222 29810',
+    address: 'Village Square, Pimpri, MP',
+    type: 'clinic'
+  },
+  {
+    id: 'hosp-7',
+    name: 'Dr. Sharma Family Clinic',
+    phone: '+91 94251 11200',
+    address: 'Station Road, Katni, MP',
+    type: 'doctors'
+  },
+  {
+    id: 'hosp-8',
     name: 'Jabalpur Tertiary Referral Hospital',
     phone: '+91 76126 20042',
     address: 'Medical College Campus, Jabalpur, MP',
@@ -115,12 +139,10 @@ export function registerDynamicVillage(villageName, latitude, longitude) {
   if (!villageName) return;
   const cleanName = villageName.trim();
   NODE_COORDINATES[cleanName] = { latitude, longitude };
-  console.log(`Registered dynamic coordinates for "${cleanName}":`, latitude, longitude);
 }
 
 /**
- * Reverse geocodes latitude/longitude coordinates into a human-readable area/town/village name
- * using OpenStreetMap's Nominatim API.
+ * Reverse geocodes latitude/longitude coordinates into a human-readable area name
  */
 export async function reverseGeocode(lat, lng) {
   try {
@@ -133,7 +155,6 @@ export async function reverseGeocode(lat, lng) {
     if (!response.ok) throw new Error('Nominatim reverse geocode request failed');
     const data = await response.json();
     const addr = data.address || {};
-    // Extract local area description (village, town, suburb, city, etc.)
     const area = addr.village || addr.town || addr.suburb || addr.city_district || addr.city || addr.county || addr.state_district || 'Regional Cluster';
     return area;
   } catch (error) {
@@ -143,28 +164,42 @@ export async function reverseGeocode(lat, lng) {
 }
 
 /**
- * Fetch real-world nearby hospitals, clinics, and doctors from OpenStreetMap Overpass API
+ * Fetch real-world nearby hospitals, clinics, PHCs, CHCs, dispensaries and doctors from OpenStreetMap Overpass API
  */
 export async function fetchNearbyHospitalsOverpass(lat, lng) {
   try {
-    const query = `[out:json][timeout:15];(node["amenity"="hospital"](around:15000,${lat},${lng});node["amenity"="clinic"](around:15000,${lat},${lng});node["amenity"="doctors"](around:15000,${lat},${lng}););out;`;
+    // Comprehensive Overpass Query searching nodes, ways, and relations for clinics, hospitals, doctors, healthcare centers
+    const query = `[out:json][timeout:25];
+(
+  nwr["amenity"="hospital"](around:25000,${lat},${lng});
+  nwr["amenity"="clinic"](around:25000,${lat},${lng});
+  nwr["amenity"="doctors"](around:25000,${lat},${lng});
+  nwr["healthcare"="clinic"](around:25000,${lat},${lng});
+  nwr["healthcare"="centre"](around:25000,${lat},${lng});
+  nwr["healthcare"="doctor"](around:25000,${lat},${lng});
+  nwr["healthcare"="hospital"](around:25000,${lat},${lng});
+  nwr["healthcare"="dispensary"](around:25000,${lat},${lng});
+);
+out center;`;
     const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
     if (!response.ok) throw new Error('Overpass API query failed');
     const data = await response.json();
     return data.elements || [];
   } catch (error) {
-    console.error("Failed to fetch real hospitals/clinics from Overpass:", error);
+    console.error("Failed to fetch real medical facilities from Overpass:", error);
     return [];
   }
 }
 
 /**
- * Async version of nearby hospitals finder.
- * Resolves real hospitals near GPS coordinates from Overpass API, otherwise falls back.
+ * Async version of nearby medical facilities finder.
+ * Resolves real clinics, PHCs, CHCs, and hospitals near GPS coordinates from Overpass API.
  */
 export async function getNearbyHospitalsAsync(lat, lng, villageName) {
   let startLat = 23.8000;
   let startLng = 80.3500; // default
+
+  let fetchedList = [];
 
   if (lat && lng) {
     startLat = lat;
@@ -173,25 +208,46 @@ export async function getNearbyHospitalsAsync(lat, lng, villageName) {
     const elements = await fetchNearbyHospitalsOverpass(lat, lng);
     
     if (elements && elements.length > 0) {
-      elements.slice(0, 15).forEach(elem => {
+      elements.forEach(elem => {
         const tags = elem.tags || {};
-        const typeLabel = tags.amenity === 'clinic' ? 'Clinic' : tags.amenity === 'doctors' ? 'Doctors Clinic' : 'Hospital';
-        const name = tags.name || `Local ${typeLabel} (${tags.operator || 'Medical Unit'})`;
-        const phone = tags.phone || tags['contact:phone'] || '+91 99999 00000';
-        const address = tags['addr:street'] || tags['addr:suburb'] || tags['addr:city'] || `${typeLabel} Services`;
+        const elemLat = elem.lat || elem.center?.lat;
+        const elemLng = elem.lon || elem.center?.lon;
 
-        NODE_COORDINATES[name] = { latitude: elem.lat, longitude: elem.lon };
+        if (!elemLat || !elemLng) return;
 
-        const exists = REGIONAL_HOSPITALS.find(h => h.name.toLowerCase() === name.toLowerCase());
-        if (!exists) {
-          REGIONAL_HOSPITALS.push({
-            id: `overpass-${elem.id}`,
-            name,
-            phone,
-            address,
-            type: tags.amenity || 'hospital'
-          });
+        let typeCategory = 'hospital';
+        let typeLabel = 'Hospital';
+
+        const amenity = (tags.amenity || '').toLowerCase();
+        const healthcare = (tags.healthcare || '').toLowerCase();
+
+        if (amenity === 'clinic' || healthcare === 'clinic' || healthcare === 'centre' || healthcare === 'dispensary') {
+          typeCategory = 'clinic';
+          typeLabel = 'Clinic / PHC';
+        } else if (amenity === 'doctors' || healthcare === 'doctor') {
+          typeCategory = 'doctors';
+          typeLabel = 'Doctor Clinic';
+        } else {
+          typeCategory = 'hospital';
+          typeLabel = 'Hospital';
         }
+
+        const rawName = tags.name || tags['name:en'] || tags['official_name'];
+        const name = rawName || `Local ${typeLabel} (${tags.operator || tags['addr:suburb'] || 'Health Unit'})`;
+        const phone = tags.phone || tags['contact:phone'] || tags['phone:mobile'] || '+91 99999 00000';
+        const address = tags['addr:full'] || tags['addr:street'] || tags['addr:suburb'] || tags['addr:city'] || `${typeLabel} Facility`;
+
+        NODE_COORDINATES[name] = { latitude: elemLat, longitude: elemLng };
+
+        fetchedList.push({
+          id: `overpass-${elem.type}-${elem.id}`,
+          name,
+          phone,
+          address,
+          type: typeCategory,
+          latitude: elemLat,
+          longitude: elemLng
+        });
       });
     }
   } else {
@@ -212,21 +268,31 @@ export async function getNearbyHospitalsAsync(lat, lng, villageName) {
     }
   }
 
-  const results = REGIONAL_HOSPITALS.map(hosp => {
+  // Combine fallback regional list with live fetched list
+  const combinedMap = new Map();
+
+  // Add regional defaults
+  REGIONAL_HOSPITALS.forEach(hosp => {
     const coords = NODE_COORDINATES[hosp.name] || { latitude: 23.8000, longitude: 80.3500 };
-    const dist = getHaversineDistance(startLat, startLng, coords.latitude, coords.longitude);
-    return {
+    combinedMap.set(hosp.name.toLowerCase(), {
       ...hosp,
-      distance: parseFloat(dist.toFixed(1)),
       latitude: coords.latitude,
       longitude: coords.longitude
+    });
+  });
+
+  // Add live fetched overpass facilities (overriding or supplementing)
+  fetchedList.forEach(item => {
+    combinedMap.set(item.name.toLowerCase(), item);
+  });
+
+  const results = Array.from(combinedMap.values()).map(hosp => {
+    const dist = getHaversineDistance(startLat, startLng, hosp.latitude, hosp.longitude);
+    return {
+      ...hosp,
+      distance: parseFloat(dist.toFixed(1))
     };
   });
 
-  const hasLocalHospitals = results.some(h => h.distance < 60);
-  const finalResults = hasLocalHospitals 
-    ? results.filter(h => h.distance < 100)
-    : results;
-
-  return finalResults.sort((a, b) => a.distance - b.distance);
+  return results.sort((a, b) => a.distance - b.distance);
 }

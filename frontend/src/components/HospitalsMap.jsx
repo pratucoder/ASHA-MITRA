@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapPin, Phone, ExternalLink, RefreshCw, Compass, ArrowLeft, Loader2 } from 'lucide-react';
-import { NODE_COORDINATES, getNearbyHospitalsAsync } from '../utils/hospitals';
+import { MapPin, Phone, ExternalLink, RefreshCw, ArrowLeft, Loader2, Stethoscope, Building2, Cross } from 'lucide-react';
+import { getNearbyHospitalsAsync } from '../utils/hospitals';
 
 export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
   const [loading, setLoading] = useState(true);
   const [hospitals, setHospitals] = useState([]);
   const [mapError, setMapError] = useState(null);
   const [selectedHospital, setSelectedHospital] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'clinic', 'hospital', 'doctors'
+
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
@@ -19,21 +21,29 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
   const lat = userCoords ? userCoords.latitude : defaultLat;
   const lng = userCoords ? userCoords.longitude : defaultLng;
 
-  // Load Leaflet assets
+  // Load Leaflet JS & CSS dynamically
   useEffect(() => {
     let active = true;
 
     const loadLeaflet = async () => {
       if (!window.L) {
         // Load CSS
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
+        if (!document.getElementById('leaflet-css')) {
+          const link = document.createElement('link');
+          link.id = 'leaflet-css';
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          document.head.appendChild(link);
+        }
 
         // Load JS
         await new Promise((resolve, reject) => {
+          if (document.getElementById('leaflet-js')) {
+            resolve();
+            return;
+          }
           const script = document.createElement('script');
+          script.id = 'leaflet-js';
           script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
           script.onload = resolve;
           script.onerror = reject;
@@ -47,8 +57,8 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
     };
 
     loadLeaflet().catch(err => {
-      console.error(err);
-      if (active) setMapError('Failed to load map library.');
+      console.error('Leaflet loading error:', err);
+      if (active) setMapError('Failed to load Leaflet mapping engine.');
     });
 
     return () => {
@@ -56,64 +66,79 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
     };
   }, []);
 
-  // Fetch hospitals
-  const loadHospitals = () => {
+  // Fetch medical facilities (hospitals, clinics, doctors)
+  const loadFacilities = () => {
+    setLoading(true);
     getNearbyHospitalsAsync(userCoords?.latitude, userCoords?.longitude, userLocationName)
       .then(res => {
         setHospitals(res);
         if (res.length > 0) {
           setSelectedHospital(res[0]);
         }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching facilities:', err);
+        setLoading(false);
       });
   };
 
   useEffect(() => {
-    if (loading) return;
-    loadHospitals();
-  }, [loading, userCoords, userLocationName]);
+    loadFacilities();
+  }, [userCoords, userLocationName]);
 
-  // Initialize Map
+  // Initialize Leaflet Map
   useEffect(() => {
     if (loading || !window.L || !mapContainerRef.current) return;
 
     const L = window.L;
 
-    // Reset map instance if already exists
+    // Reset map instance if already initialized
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
     }
 
-    // Initialize Map
-    const map = L.map(mapContainerRef.current).setView([lat, lng], 13);
+    // Create Leaflet Map Instance
+    const map = L.map(mapContainerRef.current, {
+      center: [lat, lng],
+      zoom: 13,
+      zoomControl: true
+    });
     mapInstanceRef.current = map;
 
-    // Setup Tiles
+    // Add OpenStreetMap Tile Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    // Setup Markers Layer
+    // Create Markers Layer Group
     const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
 
-    // User location icon (pulsing blue center marker using inline SVG)
+    // Custom Pulsing User Location Marker (Blue SVG)
     const userMarkerIcon = L.divIcon({
       html: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30">
-          <circle cx="12" cy="12" r="10" fill="#3B82F6" fill-opacity="0.25">
-            <animate attributeName="r" values="6;11;6" dur="2s" repeatCount="indefinite"/>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+          <circle cx="15" cy="15" r="12" fill="#3B82F6" fill-opacity="0.25">
+            <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
           </circle>
-          <circle cx="12" cy="12" r="6" fill="#1D4ED8" stroke="#FFFFFF" stroke-width="2"/>
+          <circle cx="15" cy="15" r="6" fill="#1D4ED8" stroke="#FFFFFF" stroke-width="2"/>
         </svg>
       `,
-      className: 'user-map-marker',
+      className: 'user-map-marker-wrapper',
       iconSize: [30, 30],
       iconAnchor: [15, 15]
     });
 
-    const userMarker = L.marker([lat, lng], { icon: userMarkerIcon })
-      .addTo(map);
-    userMarker.bindPopup(`<b>Your Location</b><br>${userLocationName || 'Active GPS Center'}`).openPopup();
+    const userMarker = L.marker([lat, lng], { icon: userMarkerIcon }).addTo(map);
+    userMarker.bindPopup(`
+      <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #0A2540; padding: 2px;">
+        <b style="color: #1D4ED8; font-size: 13px;">📍 Your Current Location</b><br/>
+        <span style="color: #64748B;">${userLocationName || 'Active GPS Center'}</span>
+      </div>
+    `);
 
     return () => {
       if (mapInstanceRef.current) {
@@ -123,84 +148,109 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
     };
   }, [loading, lat, lng]);
 
-  // Update Markers when hospitals change
+  // Filter facilities based on active tab
+  const filteredHospitals = hospitals.filter(h => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'clinic') return h.type === 'clinic';
+    if (activeFilter === 'hospital') return h.type === 'hospital';
+    if (activeFilter === 'doctors') return h.type === 'doctors';
+    return true;
+  });
+
+  // Update Markers on Leaflet Map whenever list or filter changes
   useEffect(() => {
     if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
 
     const L = window.L;
+    const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current;
     markersLayer.clearLayers();
     hospitalMarkersRef.current = {};
 
-    // Helper function to return custom inline SVG HTML for different marker types with a clear "+" symbol
+    // Helper to get custom colored SVG pin based on facility type
     const getMarkerHtml = (type) => {
       let pinColor = '#EF4444'; // Red for hospital
-      let crossColor = '#EF4444';
-      
+      let badgeLabel = '+';
+
       if (type === 'clinic') {
-        pinColor = '#10B981'; // Green for clinic
-        crossColor = '#10B981';
+        pinColor = '#10B981'; // Green for clinic/PHC
+        badgeLabel = 'Clinic';
       } else if (type === 'doctors') {
-        pinColor = '#F59E0B'; // Gold/Amber for doctors
-        crossColor = '#F59E0B';
+        pinColor = '#F59E0B'; // Amber for doctors
+        badgeLabel = 'Doctor';
       }
 
       return `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 30" width="30" height="38">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 18 12 18s12-9 12-18c0-6.63-5.37-12-12-12z" fill="${pinColor}" stroke="#FFFFFF" stroke-width="1.5"/>
-          <circle cx="12" cy="11" r="7" fill="#FFFFFF"/>
-          <path d="M12 7v8M8 11h8" stroke="${crossColor}" stroke-width="2.2" stroke-linecap="round"/>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 34" width="30" height="38">
+          <path d="M13 0C5.82 0 0 5.82 0 13c0 9.75 13 21 13 21s13-11.25 13-21c0-7.18-5.82-13-13-13z" fill="${pinColor}" stroke="#FFFFFF" stroke-width="1.5"/>
+          <circle cx="13" cy="12" r="7.5" fill="#FFFFFF"/>
+          <path d="M13 7.5v9M8.5 12h9" stroke="${pinColor}" stroke-width="2.4" stroke-linecap="round"/>
         </svg>
       `;
     };
 
-    hospitals.forEach(hosp => {
+    const bounds = L.latLngBounds([[lat, lng]]);
+
+    filteredHospitals.forEach(hosp => {
       const hLat = hosp.latitude;
       const hLng = hosp.longitude;
       if (hLat && hLng) {
         const customIcon = L.divIcon({
           html: getMarkerHtml(hosp.type),
-          className: 'custom-leaflet-marker-wrapper',
+          className: 'custom-facility-leaflet-marker',
           iconSize: [30, 38],
           iconAnchor: [15, 38],
           popupAnchor: [0, -38]
         });
 
-        const marker = L.marker([hLat, hLng], { icon: customIcon })
-          .addTo(markersLayer);
-        
-        marker.bindPopup(`
-          <div style="font-family: sans-serif; font-size: 13px; line-height: 1.4; padding: 2px;">
-            <b style="color: #0A2540; font-size: 14px;">${hosp.name}</b><br>
-            <span style="color: #64748B;">${hosp.address}</span><br>
-            <span style="color: #E07A5F; font-weight: 800; font-size: 11px; display: inline-block; margin-top: 4px;">📍 ${hosp.distance} km away</span>
+        const marker = L.marker([hLat, hLng], { icon: customIcon }).addTo(markersLayer);
+
+        let typeBadgeColor = 'background: #EF4444; color: #FFFFFF;';
+        let typeText = 'Hospital';
+
+        if (hosp.type === 'clinic') {
+          typeBadgeColor = 'background: #10B981; color: #FFFFFF;';
+          typeText = 'Clinic / PHC';
+        } else if (hosp.type === 'doctors') {
+          typeBadgeColor = 'background: #F59E0B; color: #FFFFFF;';
+          typeText = 'Doctor Practice';
+        }
+
+        const popupContent = `
+          <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; padding: 4px; max-width: 220px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; ${typeBadgeColor}">${typeText}</span>
+              <span style="color: #E07A5F; font-weight: 800; font-size: 11px;">📍 ${hosp.distance} km</span>
+            </div>
+            <b style="color: #0A2540; font-size: 14px;">${hosp.name}</b><br/>
+            <span style="color: #64748B; font-size: 12px;">${hosp.address}</span><br/>
+            <div style="margin-top: 8px; pt: 6px; border-top: 1px solid #F1F5F9; display: flex; gap: 6px;">
+              <a href="tel:${hosp.phone}" style="flex: 1; text-align: center; padding: 5px; background: #ECFDF5; color: #047857; font-weight: 700; border-radius: 6px; text-decoration: none; font-size: 11px;">📞 Call</a>
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hosp.name + ' ' + hosp.address)}" target="_blank" rel="noreferrer" style="flex: 1; text-align: center; padding: 5px; background: #EFF6FF; color: #1D4ED8; font-weight: 700; border-radius: 6px; text-decoration: none; font-size: 11px;">🗺️ Route ↗</a>
+            </div>
           </div>
-        `);
+        `;
+
+        marker.bindPopup(popupContent);
 
         marker.on('click', () => {
           setSelectedHospital(hosp);
         });
 
         hospitalMarkersRef.current[hosp.name] = marker;
+        bounds.extend([hLat, hLng]);
       }
     });
 
-    // Auto-pan to show all elements if hospitals exist
-    if (hospitals.length > 0) {
-      const bounds = L.latLngBounds([[lat, lng]]);
-      hospitals.forEach(hosp => {
-        if (hosp.latitude && hosp.longitude) {
-          bounds.extend([hosp.latitude, hosp.longitude]);
-        }
-      });
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+    if (filteredHospitals.length > 0) {
+      map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [hospitals, lat, lng]);
+  }, [filteredHospitals, lat, lng]);
 
   const handleFocusHospital = (hosp) => {
     setSelectedHospital(hosp);
     if (hosp.latitude && hosp.longitude && mapInstanceRef.current && window.L) {
-      mapInstanceRef.current.setView([hosp.latitude, hosp.longitude], 15, { animate: true });
+      mapInstanceRef.current.flyTo([hosp.latitude, hosp.longitude], 15, { duration: 1.2 });
       const marker = hospitalMarkersRef.current[hosp.name];
       if (marker) {
         marker.openPopup();
@@ -216,15 +266,13 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           <button 
             onClick={onBack}
             className="p-2 rounded-xl hover:bg-white/10 transition-colors text-white"
+            title="Go Back"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h2 className="font-heading font-extrabold text-lg">Locate Nearby Hospitals</h2>
-            <p className="text-xs text-white/70">Real-time GPS proximity tracker</p>
-          </div>
+          <h2 className="font-heading font-extrabold text-lg tracking-tight">Locate Nearby Healthcare</h2>
         </div>
-        <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 text-xs font-semibold">
+        <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold">
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
           <span>Area: {userLocationName || 'Active GPS Center'}</span>
         </div>
@@ -235,7 +283,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
         {loading ? (
           <div className="absolute inset-0 z-50 bg-white flex flex-col justify-center items-center gap-4">
             <Loader2 className="w-8 h-8 text-[#E07A5F] animate-spin" />
-            <span className="text-slate-600 font-bold text-sm">Loading map tiles and layers...</span>
+            <span className="text-slate-600 font-bold text-sm">Searching nearby clinics, PHCs & hospitals...</span>
           </div>
         ) : null}
 
@@ -247,14 +295,16 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           </div>
         ) : null}
 
-        {/* Left Side: Hospital List */}
+        {/* Left Side: Hospital & Clinic Sidebar List */}
         <div className="w-full lg:w-96 flex flex-col border-r border-slate-100 bg-[#FDFBF7] shrink-0 h-1/2 lg:h-full overflow-hidden">
+          
+          {/* Header & Refresh */}
           <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Nearest Facilities ({hospitals.length})
+              Facilities Found ({filteredHospitals.length})
             </span>
             <button 
-              onClick={loadHospitals}
+              onClick={loadFacilities}
               className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors"
               title="Refresh Listings"
             >
@@ -262,14 +312,65 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
             </button>
           </div>
 
+          {/* Filter Tabs: All, Clinics, Hospitals, Doctors */}
+          <div className="p-2.5 bg-slate-50/80 border-b border-slate-200/60 flex items-center gap-1 shrink-0 overflow-x-auto">
+            <button
+              onClick={() => setActiveFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                activeFilter === 'all' 
+                  ? 'bg-[#0A2540] text-white shadow-sm' 
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              All ({hospitals.length})
+            </button>
+            <button
+              onClick={() => setActiveFilter('clinic')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                activeFilter === 'clinic' 
+                  ? 'bg-emerald-600 text-white shadow-sm' 
+                  : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200/80'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              Clinics & PHC
+            </button>
+            <button
+              onClick={() => setActiveFilter('hospital')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                activeFilter === 'hospital' 
+                  ? 'bg-rose-600 text-white shadow-sm' 
+                  : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200/80'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+              Hospitals
+            </button>
+            <button
+              onClick={() => setActiveFilter('doctors')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                activeFilter === 'doctors' 
+                  ? 'bg-amber-600 text-white shadow-sm' 
+                  : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200/80'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              Doctors
+            </button>
+          </div>
+
+          {/* Facility List Cards */}
           <div className="p-4 overflow-y-auto space-y-3 flex-grow">
-            {hospitals.length === 0 ? (
+            {filteredHospitals.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-sm">
-                No hospitals found within 15km radius.
+                No facilities found under this category within 25km radius.
               </div>
             ) : (
-              hospitals.map(hosp => {
+              filteredHospitals.map(hosp => {
                 const isSelected = selectedHospital?.name === hosp.name;
+                const isClinic = hosp.type === 'clinic';
+                const isDoctor = hosp.type === 'doctors';
+
                 return (
                   <div 
                     key={hosp.id}
@@ -281,7 +382,18 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-extrabold text-[#0A2540] text-sm leading-snug">{hosp.name}</h4>
+                      <div>
+                        <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider mb-1 ${
+                          isClinic 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : isDoctor 
+                            ? 'bg-amber-100 text-amber-800' 
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {isClinic ? '🟢 Clinic / PHC' : isDoctor ? '🟡 Doctor Clinic' : '🔴 Hospital'}
+                        </span>
+                        <h4 className="font-extrabold text-[#0A2540] text-sm leading-snug">{hosp.name}</h4>
+                      </div>
                       <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${
                         isSelected ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'
                       }`}>
@@ -300,7 +412,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                         <span>Call</span>
                       </a>
                       <a 
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
                         target="_blank"
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
@@ -317,7 +429,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           </div>
         </div>
 
-        {/* Right Side: Map Container */}
+        {/* Right Side: Leaflet Map Container */}
         <div className="flex-grow h-1/2 lg:h-full relative bg-slate-50">
           <div ref={mapContainerRef} className="w-full h-full z-10" />
         </div>
