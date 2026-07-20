@@ -363,6 +363,117 @@ app.post('/api/triage', async (req, res) => {
   }
 });
 
+// POST /api/speech-to-text - Sarvam AI Speech-to-Text Proxy
+app.post('/api/speech-to-text', async (req, res) => {
+  try {
+    const { audio, languageCode } = req.body;
+    const apiKey = process.env.SARVAM_API_KEY;
+
+    if (!audio) {
+      return res.status(400).json({ error: 'Audio payload is required.' });
+    }
+
+    if (!apiKey) {
+      console.warn('⚠️ Sarvam API key missing in environment. Set SARVAM_API_KEY in backend/.env');
+      return res.status(400).json({
+        error: 'Sarvam API key is not configured.',
+        fallback: true
+      });
+    }
+
+    // Convert base64 data to Blob Buffer
+    const base64Data = audio.replace(/^data:audio\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const audioBlob = new Blob([buffer], { type: 'audio/webm' });
+
+    // Build multipart/form-data for Sarvam STT API
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('model', 'saaras:v3');
+
+    // Language code mapping (hi-IN, en-IN, mr-IN)
+    let lang = 'hi-IN';
+    if (languageCode === 'en' || languageCode === 'en-IN') lang = 'en-IN';
+    else if (languageCode === 'mr' || languageCode === 'mr-IN') lang = 'mr-IN';
+    else if (languageCode === 'hi' || languageCode === 'hi-IN') lang = 'hi-IN';
+    else lang = 'unknown';
+
+    formData.append('language_code', lang);
+
+    const sarvamRes = await fetch('https://api.sarvam.ai/speech-to-text', {
+      method: 'POST',
+      headers: {
+        'api-subscription-key': apiKey
+      },
+      body: formData
+    });
+
+    const data = await sarvamRes.json();
+
+    if (!sarvamRes.ok) {
+      console.error('Sarvam STT API Error:', data);
+      return res.status(sarvamRes.status).json({
+        error: data.message || 'Sarvam AI speech recognition failed.',
+        fallback: true
+      });
+    }
+
+    return res.json({
+      transcript: data.transcript || '',
+      language_code: data.language_code || lang
+    });
+// POST /api/translate - Sarvam AI Translation Proxy (Hindi/Marathi -> English)
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, sourceLanguageCode } = req.body;
+    const apiKey = process.env.SARVAM_API_KEY;
+
+    if (!text) {
+      return res.status(400).json({ error: 'Text payload is required.' });
+    }
+
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Sarvam API key is not configured.', fallback: true });
+    }
+
+    let srcLang = sourceLanguageCode || 'hi-IN';
+    if (srcLang === 'hi') srcLang = 'hi-IN';
+    if (srcLang === 'mr') srcLang = 'mr-IN';
+    if (srcLang === 'en' || srcLang === 'en-IN') {
+      return res.json({ translatedText: text }); // Already English
+    }
+
+    const sarvamRes = await fetch('https://api.sarvam.ai/translate', {
+      method: 'POST',
+      headers: {
+        'api-subscription-key': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        input: text,
+        source_language_code: srcLang,
+        target_language_code: 'en-IN',
+        mode: 'formal'
+      })
+    });
+
+    const data = await sarvamRes.json();
+
+    if (!sarvamRes.ok) {
+      console.error('Sarvam Translate Error:', data);
+      return res.status(sarvamRes.status).json({ error: 'Translation failed', fallback: true });
+    }
+
+    return res.json({
+      translatedText: data.translated_text || text,
+      sourceLanguageCode: srcLang
+    });
+  } catch (error) {
+    console.error('Translation Error:', error);
+    res.status(500).json({ error: 'Internal translation error', fallback: true });
+  }
+});
+
 // GET /api/health - Server & DB status check
 app.get('/api/health', (req, res) => {
   res.json({

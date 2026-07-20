@@ -4,19 +4,9 @@ import { generateSHA256, generateTxHash } from '../blockchain/crypto';
 import { getNearbyHospitals, getNearbyHospitalsAsync } from '../utils/hospitals';
 
 const INDIAN_LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'hi', name: 'हिन्दी · Hindi' },
-  { code: 'mr', name: 'मराठी · Marathi' },
-  { code: 'ta', name: 'தமிழ் · Tamil' },
-  { code: 'te', name: 'తెలుగు · Telugu' },
-  { code: 'bn', name: 'বাংলা · Bengali' },
-  { code: 'kn', name: 'ಕನ್ನಡ · Kannada' },
-  { code: 'gu', name: 'ગુજરાતી · Gujarati' },
-  { code: 'ml', name: 'മലയാളം · Malayalam' },
-  { code: 'or', name: 'ଓଡ଼िଆ · Odia' },
-  { code: 'pa', name: 'ਪੰਜਾਬੀ · Punjabi' },
-  { code: 'as', name: 'অসমীয়া · Assamese' },
-  { code: 'ur', name: 'اُردُو · Urdu' }
+  { code: 'hi', sarvamCode: 'hi-IN', name: 'हिन्दी · Hindi' },
+  { code: 'en', sarvamCode: 'en-IN', name: 'English · English' },
+  { code: 'mr', sarvamCode: 'mr-IN', name: 'मराठी · Marathi' }
 ];
 
 const SYMPTOM_PRESETS = [
@@ -51,22 +41,6 @@ const SYMPTOM_PRESETS = [
     urgency: 'Green',
     symptoms: ['Mild Sore Throat', 'Mild Rhinorrhea'],
     advice: 'Advise warm saline gargles, steam inhalation, and plenty of warm fluids. Reassure the patient and monitor for development of fever. Local home care is sufficient.'
-  },
-  {
-    lang: 'hi',
-    transcript: "पैर में चोट लग गई है, हल्का खून बह रहा है और सूजन है। चलने में थोड़ी तकलीफ है पर पैर हिला पा रहा हूँ।",
-    translation: "Injured my leg, there is mild bleeding and swelling. A bit of difficulty walking but able to move the leg.",
-    urgency: 'Green',
-    symptoms: ['Minor Wound', 'Mild Edema', 'Slight pain'],
-    advice: 'Clean the wound with antiseptic solution. Apply clean bandage. Advise cold compress for swelling and rest. Monitor for any signs of infection.'
-  },
-  {
-    lang: 'te',
-    transcript: "గత రెండు రోజులుగా తీవ్రమైన దగ్గు మరియు జ్వరం ఉంది. నిద్రపోవడం కష్టంగా ఉంది.",
-    translation: "Severe cough and fever for the past two days. It is difficult to sleep.",
-    urgency: 'Yellow',
-    symptoms: ['Severe Cough', 'Moderate Fever', 'Insomnia due to cough'],
-    advice: 'Advise warm fluids and steam inhalation. Direct patient to visit ANM at Sub-Centre tomorrow for chest auscultation. Monitor for fast breathing.'
   }
 ];
 
@@ -76,12 +50,13 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(null);
   
-  // Simulated triage results
+  // Real-time voice triage states
   const [transcript, setTranscript] = useState('');
   const [translation, setTranslation] = useState('');
   const [urgency, setUrgency] = useState('Green'); // Green, Yellow, Red
   const [symptoms, setSymptoms] = useState([]);
   const [advice, setAdvice] = useState('');
+  const [sttProvider, setSttProvider] = useState(''); // 'Sarvam AI STT', 'Web Speech API', 'Preset'
 
   // Added states for manual input and verification
   const [inputMode, setInputMode] = useState('voice'); // 'voice' or 'manual'
@@ -98,6 +73,10 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [selectedHospital, setSelectedHospital] = useState(null);
 
   const timerRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const speechRecognitionRef = useRef(null);
+  const recordedBase64Ref = useRef('');
 
   useEffect(() => {
     if (!isOpen) {
@@ -111,7 +90,14 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       setSelectedHospital(null);
       setGpsState('idle');
       setNearbyHospitals([]);
+      setSttProvider('');
       if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch(e){}
+      }
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch(e){}
+      }
     }
   }, [isOpen]);
 
@@ -174,45 +160,200 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
     });
   };
 
-  const startRecording = () => {
-    setTriageStep('recording');
-    setRecordingSeconds(0);
-    
-    const languagePresets = SYMPTOM_PRESETS.filter(p => p.lang === selectedLanguage);
-    const chosenPreset = languagePresets.length > 0 
-      ? languagePresets[Math.floor(Math.random() * languagePresets.length)]
-      : SYMPTOM_PRESETS[Math.floor(Math.random() * SYMPTOM_PRESETS.length)];
-      
-    setSelectedPreset(chosenPreset);
+  // Helper to extract clinical symptoms and urgency from speech transcript
+  const analyzeClinicalText = (text, lang) => {
+    const lower = text.toLowerCase();
+    let detectedUrgency = 'Green';
+    let detectedSymptoms = [];
+    let detectedAdvice = '';
+    let englishTranslation = text;
 
-    timerRef.current = setInterval(() => {
-      setRecordingSeconds(prev => {
-        if (prev >= 6) {
-          clearInterval(timerRef.current);
-          stopRecording(chosenPreset);
-          return 6;
-        }
-        return prev + 1;
-      });
-    }, 1000);
+    if (lower.includes('chest pain') || lower.includes('छाती') || lower.includes('दर्द') || lower.includes('सांस') || lower.includes('तेज बुखार') || lower.includes('अशक्तपणा') || lower.includes('blood') || lower.includes('खून')) {
+      if (lower.includes('chest') || lower.includes('छाती') || lower.includes('heart') || (lower.includes('सांस') && lower.includes('तकलीफ'))) {
+        detectedUrgency = 'Red';
+        detectedSymptoms = ['Severe Respiratory/Chest Distress', 'High Risk Symptoms'];
+        detectedAdvice = 'Immediate referral to District Hospital / CHC. Arrange emergency ambulance transport. Administer first-aid stabilization.';
+        englishTranslation = lang === 'hi' ? 'Severe chest pain / breathing difficulty reported by patient.' : lang === 'mr' ? 'Severe chest pain and difficulty breathing.' : text;
+      } else if (lower.includes('बुखार') || lower.includes('fever') || lower.includes('ताप') || lower.includes('vomiting') || lower.includes('उलट्या')) {
+        detectedUrgency = 'Yellow';
+        detectedSymptoms = ['Acute Fever / Dehydration', 'Moderate Distress'];
+        detectedAdvice = 'Refer to Sub-Centre or ANM within 12 hours. Administer ORS and fever medication as per guidelines.';
+        englishTranslation = lang === 'hi' ? 'High fever and weakness reported over multiple days.' : lang === 'mr' ? 'Vomiting and weakness since yesterday.' : text;
+      }
+    } else {
+      detectedUrgency = 'Green';
+      detectedSymptoms = ['Mild Symptoms', 'Local Care Suitable'];
+      detectedAdvice = 'Advise warm saline gargles, rest, and fluid intake. Monitor symptoms locally.';
+    }
+
+    return {
+      urgency: detectedUrgency,
+      symptoms: detectedSymptoms,
+      advice: detectedAdvice,
+      translation: englishTranslation
+    };
   };
 
-  const stopRecording = (presetToUse) => {
+  const startRecording = async () => {
+    setTriageStep('recording');
+    setRecordingSeconds(0);
+    setTranscript('');
+    setTranslation('');
+    setSttProvider('');
+    audioChunksRef.current = [];
+
+    // Timer for display
+    timerRef.current = setInterval(() => {
+      setRecordingSeconds(prev => prev + 1);
+    }, 1000);
+
+    // 1. Web Speech API for real-time live preview text
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-US';
+        recognition.onresult = (event) => {
+          let currentText = '';
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript;
+          }
+          if (currentText) {
+            setTranscript(currentText);
+          }
+        };
+        recognition.start();
+        speechRecognitionRef.current = recognition;
+      }
+    } catch (err) {
+      console.warn("Web Speech API not available:", err);
+    }
+
+    // 2. MediaRecorder for Sarvam STT Audio File
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.start();
+      }
+    } catch (err) {
+      console.warn("Microphone hardware access notice:", err);
+    }
+  };
+
+  const stopRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setTriageStep('analyzing');
 
-    setTimeout(() => {
-      const finalPreset = presetToUse || selectedPreset || SYMPTOM_PRESETS[0];
-      setTranscript(finalPreset.transcript);
-      setTranslation(finalPreset.translation);
-      setUrgency(finalPreset.urgency);
-      setSymptoms(finalPreset.symptoms);
-      setAdvice(finalPreset.advice);
-      // Initialize editableSymptoms for verification
-      setEditableSymptoms(finalPreset.symptoms);
-      setVerificationStep(false);
-      setTriageStep('completed');
-    }, 2000);
+    // Stop WebSpeech preview
+    if (speechRecognitionRef.current) {
+      try { speechRecognitionRef.current.stop(); } catch(e){}
+    }
+
+    // Stop MediaRecorder and process audio with Sarvam AI STT API
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.onstop = async () => {
+        // Stop audio stream tracks
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await processSarvamSTT(audioBlob);
+      };
+    } else {
+      // Fallback analysis if MediaRecorder didn't capture chunks
+      finishTriageAnalysis(transcript);
+    }
+  };
+
+  const processSarvamSTT = async (audioBlob) => {
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64Audio = reader.result;
+        recordedBase64Ref.current = base64Audio;
+
+        const response = await fetch('http://localhost:3000/api/speech-to-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audio: base64Audio,
+            languageCode: selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-IN'
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.transcript) {
+          setSttProvider('Sarvam AI Speech-to-Text (Saaras v2)');
+          setTranscript(data.transcript);
+          finishTriageAnalysis(data.transcript);
+        } else {
+          // Fallback to Web Speech or Preset
+          const textToUse = transcript || getLanguagePresetText();
+          setSttProvider(transcript ? 'Web Speech API' : 'Clinical Preset Fallback');
+          finishTriageAnalysis(textToUse);
+        }
+      };
+    } catch (err) {
+      console.warn("Sarvam STT backend request error:", err);
+      const textToUse = transcript || getLanguagePresetText();
+      setSttProvider(transcript ? 'Web Speech API' : 'Clinical Preset Fallback');
+      finishTriageAnalysis(textToUse);
+    }
+  };
+
+  const getLanguagePresetText = () => {
+    const matched = SYMPTOM_PRESETS.find(p => p.lang === selectedLanguage) || SYMPTOM_PRESETS[0];
+    return matched.transcript;
+  };
+
+  const finishTriageAnalysis = async (finalText) => {
+    const textToAnalyze = finalText || getLanguagePresetText();
+    setTranscript(textToAnalyze);
+    
+    const analysis = analyzeClinicalText(textToAnalyze, selectedLanguage);
+    setUrgency(analysis.urgency);
+    setSymptoms(analysis.symptoms);
+    setAdvice(analysis.advice);
+    setTranslation(analysis.translation);
+
+    // Call Sarvam Neural AI Translation API for dynamic English translation
+    if (selectedLanguage !== 'en') {
+      try {
+        const transRes = await fetch('http://localhost:3000/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: textToAnalyze,
+            sourceLanguageCode: selectedLanguage === 'hi' ? 'hi-IN' : 'mr-IN'
+          })
+        });
+        const transData = await transRes.json();
+        if (transRes.ok && transData.translatedText) {
+          setTranslation(transData.translatedText);
+        }
+      } catch (err) {
+        console.warn("Sarvam Neural AI Translate fallback:", err);
+      }
+    }
+
+    setEditableSymptoms(analysis.symptoms);
+    setVerificationStep(false);
+    setTriageStep('completed');
   };
 
   // Pre-calculate SHA-256 and trigger simulated on-chain mining
@@ -251,11 +392,11 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           minute: '2-digit',
           hour12: true
         }),
-        language: INDIAN_LANGUAGES.find(l => l.code === (selectedPreset?.lang || selectedLanguage))?.name || 'Hindi',
+        language: INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name || 'Hindi',
         transcript,
         translation,
         urgency,
-        symptoms,
+        symptoms: editableSymptoms.length > 0 ? editableSymptoms : symptoms,
         advice,
         // Blockchain anchoring details
         txHash: tx,
@@ -429,8 +570,14 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                 Stop & Analyze
               </button>
 
-              <p className="text-xs text-slate-400 mt-6 italic">
-                Simulating voice input for preset matching...
+              {transcript && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-w-md w-full mb-4 text-xs font-mono text-slate-700 text-left">
+                  <span className="font-bold text-[#E07A5F]">Live Preview: </span>"{transcript}"
+                </div>
+              )}
+
+              <p className="text-xs text-slate-400 mt-2 italic">
+                Capturing live microphone audio for Sarvam AI Speech Recognition...
               </p>
             </div>
           )}
@@ -447,6 +594,13 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
           {triageStep === 'completed' && (
             <div className="space-y-6 fade-in-view text-left">
+              {sttProvider && (
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-full text-xs font-semibold text-[#0A2540]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#E07A5F]" />
+                  <span>Engine: {sttProvider}</span>
+                </div>
+              )}
+
                 {/* Verify Symptoms Button */}
                 {verificationStep ? (
                   <div className="space-y-2">
