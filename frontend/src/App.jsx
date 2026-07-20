@@ -296,13 +296,57 @@ function App() {
     showToast('Signed out successfully.');
   };
 
-  const handleAddPatient = (patientData, andStartTriage) => {
-    const createdPatient = {
-      id: Date.now().toString(),
-      ...patientData,
-      village: patientData.village || 'Rampur',
-      phone: patientData.phone || 'Not provided'
-    };
+  // Fetch Patients & Triage History from Backend on User Login
+  useEffect(() => {
+    if (user) {
+      // Fetch Patients
+      fetch('http://localhost:3000/api/patients')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && Array.isArray(data) && data.length > 0) {
+            setPatients(data);
+          }
+        })
+        .catch(err => console.warn('Could not fetch patients from backend, using local:', err));
+
+      // Fetch Triage History
+      fetch('http://localhost:3000/api/triage')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && Array.isArray(data) && data.length > 0) {
+            setTriageHistory(data);
+          }
+        })
+        .catch(err => console.warn('Could not fetch triage history from backend, using local:', err));
+    }
+  }, [user]);
+
+  const handleAddPatient = async (patientData, andStartTriage) => {
+    let createdPatient = null;
+    try {
+      const response = await fetch('http://localhost:3000/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...patientData,
+          createdBy: user?.id
+        })
+      });
+      if (response.ok) {
+        createdPatient = await response.json();
+      }
+    } catch (err) {
+      console.warn('Backend patient save offline fallback:', err);
+    }
+
+    if (!createdPatient) {
+      createdPatient = {
+        id: Date.now().toString(),
+        ...patientData,
+        village: patientData.village || 'Rampur',
+        phone: patientData.phone || 'Not provided'
+      };
+    }
 
     setPatients(prev => [createdPatient, ...prev]);
     showToast('Patient registered successfully!');
@@ -315,13 +359,34 @@ function App() {
     }
   };
 
-  const handleSaveTriage = (triageData) => {
-    const newTriageRecord = {
-      id: Date.now().toString(),
+  const handleSaveTriage = async (triageData) => {
+    const payload = {
       ashaName: user.name,
       resolved: false,
       ...triageData
     };
+
+    let newTriageRecord = null;
+    try {
+      const response = await fetch('http://localhost:3000/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        newTriageRecord = await response.json();
+      }
+    } catch (err) {
+      console.warn('Backend triage save offline fallback:', err);
+    }
+
+    if (!newTriageRecord) {
+      newTriageRecord = {
+        id: Date.now().toString(),
+        ...payload
+      };
+    }
+
     setTriageHistory(prev => [newTriageRecord, ...prev]);
     showToast('Triage assessment compiled and saved!');
     setCurrentView('history');
