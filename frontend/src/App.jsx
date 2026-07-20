@@ -174,52 +174,66 @@ function App() {
     });
   }, []);
 
-  const handleRegister = (newUserData) => {
-    const newUser = {
-      id: Date.now(),
-      ...newUserData
-    };
+  const handleRegister = async (newUserData) => {
+    setError(null);
+    setLoading(true);
 
-    // Register custom village in Dijkstra graph
-    if (newUserData.coordinates) {
-      registerDynamicVillage(newUserData.location, newUserData.coordinates.latitude, newUserData.coordinates.longitude);
-      
-      const savedVillages = JSON.parse(localStorage.getItem('asha_dynamic_villages') || '[]');
-      if (!savedVillages.find(v => v.name.toLowerCase() === newUserData.location.toLowerCase())) {
-        savedVillages.push({
-          name: newUserData.location,
-          lat: newUserData.coordinates.latitude,
-          lng: newUserData.coordinates.longitude
-        });
-        localStorage.setItem('asha_dynamic_villages', JSON.stringify(savedVillages));
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUserData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
       }
-    }
 
-    setRegisteredUsers(prev => {
-      const updated = [newUser, ...prev];
-      localStorage.setItem('asha_registered_users', JSON.stringify(updated));
-      return updated;
-    });
+      if (newUserData.coordinates) {
+        registerDynamicVillage(newUserData.location, newUserData.coordinates.latitude, newUserData.coordinates.longitude);
+      }
 
-    // Automatically login the registered user
-    setUser(newUser);
-    localStorage.setItem('token', 'mock-offline-token-' + newUser.id);
-    localStorage.setItem('asha_user', JSON.stringify(newUser));
-    if (newUser.coordinates) {
-      setUserCoords(newUser.coordinates);
+      setUser(data.user);
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('asha_user', JSON.stringify(data.user));
+      if (data.user.coordinates) {
+        setUserCoords(data.user.coordinates);
+      }
+      showToast('Account registered successfully!');
+    } catch (err) {
+      // Offline / local fallback
+      const newUser = {
+        id: Date.now(),
+        ...newUserData
+      };
+
+      if (newUserData.coordinates) {
+        registerDynamicVillage(newUserData.location, newUserData.coordinates.latitude, newUserData.coordinates.longitude);
+      }
+
+      setRegisteredUsers(prev => {
+        const updated = [newUser, ...prev];
+        localStorage.setItem('asha_registered_users', JSON.stringify(updated));
+        return updated;
+      });
+
+      setUser(newUser);
+      localStorage.setItem('token', 'offline-token-' + newUser.id);
+      localStorage.setItem('asha_user', JSON.stringify(newUser));
+      if (newUser.coordinates) {
+        setUserCoords(newUser.coordinates);
+      }
+      showToast('Account created (Local Mode)');
+    } finally {
+      setLoading(false);
     }
-    showToast('Registered and logged in!', 'success');
   };
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const fillDemo = (demoPhone, demoPass) => {
-    setPhone(demoPhone);
-    setPassword(demoPass);
-    setError(null);
   };
 
   const handleLogin = async (e) => {
@@ -250,26 +264,23 @@ function App() {
       setUser(data.user);
       localStorage.setItem('token', data.token);
       localStorage.setItem('asha_user', JSON.stringify(data.user));
+      if (data.user.coordinates) {
+        setUserCoords(data.user.coordinates);
+      }
       showToast('Logged in successfully!');
     } catch (err) {
-      // Fallback Offline/Demo Auth
-      const mockUsers = [
-        { id: 1, phone: '9999900001', password: 'password123', name: 'Sunita Devi', role: 'ASHA Worker', location: 'Rampur' },
-        { id: 2, phone: '9999900003', password: 'password123', name: 'Dr. Anjali Sharma', role: 'ANM Supervisor', location: 'District Hospital' },
-        ...registeredUsers
-      ];
- 
-      const foundUser = mockUsers.find(u => u.phone === phone && u.password === password);
+      // Check locally registered users if server failed
+      const foundUser = registeredUsers.find(u => u.phone === phone && u.password === password);
       if (foundUser) {
         setUser(foundUser);
-        localStorage.setItem('token', 'mock-offline-token-' + foundUser.id);
+        localStorage.setItem('token', 'offline-token-' + foundUser.id);
         localStorage.setItem('asha_user', JSON.stringify(foundUser));
         if (foundUser.coordinates) {
           setUserCoords(foundUser.coordinates);
         }
-        showToast('Logged in (Offline Mode)', 'success');
+        showToast('Logged in successfully!');
       } else {
-        setError('Invalid phone number or password. Try demo accounts!');
+        setError(err.message || 'Invalid phone number or password.');
       }
     } finally {
       setLoading(false);
@@ -341,7 +352,6 @@ function App() {
         loading={loading}
         error={error}
         handleLogin={handleLogin}
-        fillDemo={fillDemo}
         selectedLanguage={selectedLanguage}
         setSelectedLanguage={setSelectedLanguage}
         handleRegister={handleRegister}

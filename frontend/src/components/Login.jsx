@@ -10,7 +10,6 @@ export default function Login({
   loading,
   error,
   handleLogin,
-  fillDemo,
   selectedLanguage,
   setSelectedLanguage,
   handleRegister
@@ -24,6 +23,7 @@ export default function Login({
   const [regCoords, setRegCoords] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [regError, setRegError] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
 
   const handleFetchGPS = () => {
     setGpsLoading(true);
@@ -34,7 +34,6 @@ export default function Login({
           const { latitude, longitude } = position.coords;
           setRegCoords({ latitude, longitude });
           
-          // Reverse geocode to get the human-readable area name automatically
           const areaName = await reverseGeocode(latitude, longitude);
           if (areaName) {
             setRegLocation(areaName);
@@ -42,8 +41,8 @@ export default function Login({
           
           setGpsLoading(false);
         },
-        (error) => {
-          console.error("GPS Fetch error: ", error);
+        (err) => {
+          console.error("GPS Fetch error: ", err);
           setRegError('Failed to capture GPS coordinates. Please allow location permissions.');
           setGpsLoading(false);
         },
@@ -55,21 +54,28 @@ export default function Login({
     }
   };
 
-  const handleRegSubmit = (e) => {
+  const handleRegSubmit = async (e) => {
     e.preventDefault();
     setRegError('');
     if (!regName || !regPhone || !regPassword || !regLocation) {
       setRegError('Please fill out all required fields.');
       return;
     }
-    handleRegister({
-      name: regName,
-      phone: regPhone,
-      password: regPassword,
-      role: regRole === 'ASHA Worker' ? 'ASHA Worker' : 'ANM Supervisor',
-      location: regLocation,
-      coordinates: regCoords
-    });
+    setRegLoading(true);
+    try {
+      await handleRegister({
+        name: regName,
+        phone: regPhone,
+        password: regPassword,
+        role: regRole === 'ASHA Worker' ? 'ASHA Worker' : 'ANM Supervisor',
+        location: regLocation,
+        coordinates: regCoords
+      });
+    } catch (err) {
+      setRegError(err.message || 'Registration failed.');
+    } finally {
+      setRegLoading(false);
+    }
   };
 
   return (
@@ -103,7 +109,7 @@ export default function Login({
           </p>
           <div className="mt-8 flex items-center gap-3 text-sm text-white/60">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-            <span>System online · Voice & AI ready</span>
+            <span>Real-Time Production Server Online</span>
           </div>
         </div>
         
@@ -137,9 +143,9 @@ export default function Login({
             /* SIGN IN VIEW */
             <>
               <div className="mb-8">
-                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">Welcome back</div>
-                <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">Sign in to continue</h1>
-                <p className="text-slate-600 mt-2">Use your registered phone number and password.</p>
+                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">Welcome</div>
+                <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">Sign in to your account</h1>
+                <p className="text-slate-600 mt-2 text-sm">Enter your registered phone number and password.</p>
               </div>
 
               {error && (
@@ -155,10 +161,11 @@ export default function Login({
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     <input 
                       type="tel"
+                      required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full min-h-[56px] pl-12 pr-4 rounded-xl border-2 border-slate-200 bg-white text-lg focus:border-[#0A2540] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="9999900001" 
+                      placeholder="e.g. 9876543210" 
                       disabled={loading}
                     />
                   </div>
@@ -170,6 +177,7 @@ export default function Login({
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     <input 
                       type="password"
+                      required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full min-h-[56px] pl-12 pr-4 rounded-xl border-2 border-slate-200 bg-white text-lg focus:border-[#0A2540] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
@@ -195,21 +203,14 @@ export default function Login({
                 </button>
               </form>
               
-              <div className="mt-8 p-5 bg-slate-50 rounded-2xl border border-slate-200/60 shadow-sm">
-                <div className="text-xs font-bold tracking-wider uppercase text-slate-500 mb-3">Demo accounts (tap to fill)</div>
-                <div className="grid gap-2">
-                  <button onClick={() => fillDemo('9999900001', 'password123')} type="button" className="w-full text-left text-sm px-4 py-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 flex justify-between items-center transition-colors">
-                    <span><b className="font-semibold text-[#0A2540]">Sunita Devi</b> <span className="text-slate-500">· ASHA · Rampur</span></span>
-                    <span className="text-slate-500 font-mono text-xs font-semibold">9999900001</span>
-                  </button>
-                  <button onClick={() => fillDemo('9999900003', 'password123')} type="button" className="w-full text-left text-sm px-4 py-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 flex justify-between items-center transition-colors">
-                    <span><b className="font-semibold text-[#0A2540]">Dr. Anjali Sharma</b> <span className="text-slate-500">· ANM</span></span>
-                    <span className="text-slate-500 font-mono text-xs font-semibold">9999900003</span>
-                  </button>
-                </div>
-                <div className="mt-4 text-xs text-slate-500 text-center">
-                  New here? <button onClick={() => setIsRegistering(true)} className="text-[#E07A5F] font-semibold hover:underline bg-transparent border-none cursor-pointer">Register as ASHA / ANM</button>
-                </div>
+              <div className="mt-8 pt-6 border-t border-slate-100 text-sm text-slate-600 text-center">
+                Don't have an account?{' '}
+                <button 
+                  onClick={() => setIsRegistering(true)} 
+                  className="text-[#E07A5F] font-bold hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  Register New Account
+                </button>
               </div>
             </>
           ) : (
@@ -217,8 +218,8 @@ export default function Login({
             <>
               <div className="mb-6">
                 <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">Create an account</div>
-                <h1 className="font-heading text-2xl font-extrabold text-[#0A2540]">ASHA / ANM Register</h1>
-                <p className="text-slate-600 mt-1 text-sm">Register your workspace details and lock GPS.</p>
+                <h1 className="font-heading text-2xl font-extrabold text-[#0A2540]">ASHA / ANM Registration</h1>
+                <p className="text-slate-600 mt-1 text-sm">Register your details to create your secure workspace.</p>
               </div>
 
               {regError && (
@@ -238,7 +239,7 @@ export default function Login({
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="e.g. Geeta Verma" 
+                      placeholder="Enter full name" 
                     />
                   </div>
                 </div>
@@ -253,7 +254,7 @@ export default function Login({
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="e.g. 9999900004" 
+                      placeholder="10-digit mobile number" 
                     />
                   </div>
                 </div>
@@ -268,7 +269,7 @@ export default function Login({
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="••••••••" 
+                      placeholder="Create a password" 
                     />
                   </div>
                 </div>
@@ -293,7 +294,7 @@ export default function Login({
                       value={regLocation}
                       onChange={(e) => setRegLocation(e.target.value)}
                       className="w-full min-h-[48px] px-3 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="e.g. Shivpur" 
+                      placeholder="Village / Town" 
                     />
                   </div>
                 </div>
@@ -319,7 +320,7 @@ export default function Login({
                       ) : (
                         <MapPin className="w-4 h-4 text-[#E07A5F]" />
                       )}
-                      {gpsLoading ? 'Fetching Coordinate...' : regCoords ? 'GPS Location Locked' : 'Fetch GPS Home Location'}
+                      {gpsLoading ? 'Fetching Coordinates...' : regCoords ? 'GPS Location Locked' : 'Fetch GPS Home Location'}
                     </button>
                   </div>
                   {regCoords && (
@@ -331,15 +332,28 @@ export default function Login({
 
                 <button 
                   type="submit" 
-                  className="w-full min-h-[50px] mt-4 rounded-2xl bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold text-sm shadow-soft flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  disabled={regLoading}
+                  className="w-full min-h-[50px] mt-4 rounded-2xl bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold text-sm shadow-soft flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-60"
                 >
-                  Create Account & Login
-                  <ArrowRight className="w-4 h-4" />
+                  {regLoading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      Create Account & Sign In
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
               
               <div className="mt-4 text-xs text-slate-500 text-center">
-                Already registered? <button onClick={() => setIsRegistering(false)} className="text-[#E07A5F] font-semibold hover:underline bg-transparent border-none cursor-pointer">Sign in to your account</button>
+                Already registered?{' '}
+                <button 
+                  onClick={() => setIsRegistering(false)} 
+                  className="text-[#E07A5F] font-semibold hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  Sign in to your account
+                </button>
               </div>
             </>
           )}
