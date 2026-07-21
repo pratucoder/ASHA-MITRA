@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const { analyzeSpokenTriage } = require('./llm/openrouter');
 
 const User = require('./models/User');
 const Patient = require('./models/Patient');
@@ -422,6 +423,12 @@ app.post('/api/speech-to-text', async (req, res) => {
       transcript: data.transcript || '',
       language_code: data.language_code || lang
     });
+  } catch (error) {
+    console.error('Speech-to-Text Error:', error);
+    res.status(500).json({ error: 'Internal speech-to-text error', fallback: true });
+  }
+});
+
 // POST /api/translate - Sarvam AI Translation Proxy (Hindi/Marathi -> English)
 app.post('/api/translate', async (req, res) => {
   try {
@@ -471,6 +478,22 @@ app.post('/api/translate', async (req, res) => {
   } catch (error) {
     console.error('Translation Error:', error);
     res.status(500).json({ error: 'Internal translation error', fallback: true });
+  }
+});
+
+// POST /api/analyze-triage - OpenRouter LLM Voice Triage Engine
+app.post('/api/analyze-triage', async (req, res) => {
+  try {
+    const { text, language } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'Speech text payload is required.' });
+    }
+
+    const triageAnalysis = await analyzeSpokenTriage({ text, language });
+    return res.json(triageAnalysis);
+  } catch (error) {
+    console.error('Speech Triage Analysis Error:', error);
+    res.status(500).json({ error: 'Internal triage analysis error' });
   }
 });
 

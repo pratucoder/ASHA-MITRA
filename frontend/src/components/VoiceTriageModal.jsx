@@ -55,11 +55,13 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [translation, setTranslation] = useState('');
   const [urgency, setUrgency] = useState('Green'); // Green, Yellow, Red
   const [symptoms, setSymptoms] = useState([]);
+  const [keywords, setKeywords] = useState([]);
   const [advice, setAdvice] = useState('');
-  const [sttProvider, setSttProvider] = useState(''); // 'Sarvam AI STT', 'Web Speech API', 'Preset'
+  const [sttProvider, setSttProvider] = useState(''); // 'OpenRouter (gemini-2.5-flash)', 'Sarvam AI STT', 'Web Speech API', etc.
 
   // Added states for manual input and verification
   const [inputMode, setInputMode] = useState('voice'); // 'voice' or 'manual'
+  const [manualText, setManualText] = useState('');
   const [verificationStep, setVerificationStep] = useState(false);
   const [editableSymptoms, setEditableSymptoms] = useState([]);
 
@@ -85,6 +87,8 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       setSelectedPreset(null);
       setTranscript('');
       setTranslation('');
+      setManualText('');
+      setKeywords([]);
       setAnchoringLogs('');
       setCalculatedHash('');
       setSelectedHospital(null);
@@ -168,6 +172,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
     let detectedAdvice = '';
     let englishTranslation = text;
 
+    const words = text.split(/[\s,।.]+/).map(w => w.trim()).filter(w => w.length > 2);
+    const detectedKeywords = Array.from(new Set(words)).slice(0, 5);
+
     if (lower.includes('chest pain') || lower.includes('छाती') || lower.includes('दर्द') || lower.includes('सांस') || lower.includes('तेज बुखार') || lower.includes('अशक्तपणा') || lower.includes('blood') || lower.includes('खून')) {
       if (lower.includes('chest') || lower.includes('छाती') || lower.includes('heart') || (lower.includes('सांस') && lower.includes('तकलीफ'))) {
         detectedUrgency = 'Red';
@@ -189,6 +196,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
     return {
       urgency: detectedUrgency,
       symptoms: detectedSymptoms,
+      keywords: detectedKeywords,
       advice: detectedAdvice,
       translation: englishTranslation
     };
@@ -297,22 +305,32 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
         const data = await response.json();
 
-        if (response.ok && data.transcript) {
-          setSttProvider('Sarvam AI Speech-to-Text (Saaras v2)');
+        if (response.ok && data.transcript && data.transcript.trim()) {
+          setSttProvider('Sarvam AI Speech-to-Text');
           setTranscript(data.transcript);
           finishTriageAnalysis(data.transcript);
         } else {
-          // Fallback to Web Speech or Preset
-          const textToUse = transcript || getLanguagePresetText();
-          setSttProvider(transcript ? 'Web Speech API' : 'Clinical Preset Fallback');
-          finishTriageAnalysis(textToUse);
+          // Fallback to Web Speech API text if captured from live microphone
+          const textToUse = (transcript || '').trim();
+          if (textToUse) {
+            setSttProvider('Web Speech API');
+            finishTriageAnalysis(textToUse);
+          } else {
+            setTriageStep('idle');
+            alert("No speech text was recognized. Please click the mic and speak clearly, or enter symptoms using Manual Input.");
+          }
         }
       };
     } catch (err) {
       console.warn("Sarvam STT backend request error:", err);
-      const textToUse = transcript || getLanguagePresetText();
-      setSttProvider(transcript ? 'Web Speech API' : 'Clinical Preset Fallback');
-      finishTriageAnalysis(textToUse);
+      const textToUse = (transcript || '').trim();
+      if (textToUse) {
+        setSttProvider('Web Speech API');
+        finishTriageAnalysis(textToUse);
+      } else {
+        setTriageStep('idle');
+        alert("Speech-to-text service unavailable. Please speak again or use Manual Input.");
+      }
     }
   };
 
@@ -322,36 +340,54 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   };
 
   const finishTriageAnalysis = async (finalText) => {
-    const textToAnalyze = finalText || getLanguagePresetText();
-    setTranscript(textToAnalyze);
-    
-    const analysis = analyzeClinicalText(textToAnalyze, selectedLanguage);
-    setUrgency(analysis.urgency);
-    setSymptoms(analysis.symptoms);
-    setAdvice(analysis.advice);
-    setTranslation(analysis.translation);
-
-    // Call Sarvam Neural AI Translation API for dynamic English translation
-    if (selectedLanguage !== 'en') {
-      try {
-        const transRes = await fetch('http://localhost:3000/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: textToAnalyze,
-            sourceLanguageCode: selectedLanguage === 'hi' ? 'hi-IN' : 'mr-IN'
-          })
-        });
-        const transData = await transRes.json();
-        if (transRes.ok && transData.translatedText) {
-          setTranslation(transData.translatedText);
-        }
-      } catch (err) {
-        console.warn("Sarvam Neural AI Translate fallback:", err);
-      }
+    const textToAnalyze = (finalText || transcript || '').trim();
+    if (!textToAnalyze) {
+      setTriageStep('idle');
+      alert("No speech input was received. Please record again or type the symptoms manually.");
+      return;
     }
 
-    setEditableSymptoms(analysis.symptoms);
+    setTranscript(textToAnalyze);
+
+    try {
+      const res = await fetch('http://localhost:3000/api/analyze-triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: textToAnalyze,
+          language: selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-IN'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data) {
+        setUrgency(data.urgency || 'Green');
+        setSymptoms(data.symptoms || []);
+        setKeywords(data.keywords || []);
+        setAdvice(data.advice || '');
+        setTranslation(data.translation || textToAnalyze);
+        setEditableSymptoms(data.symptoms || []);
+        if (data.provider) setSttProvider(data.provider);
+      } else {
+        const fallback = analyzeClinicalText(textToAnalyze, selectedLanguage);
+        setUrgency(fallback.urgency);
+        setSymptoms(fallback.symptoms);
+        setKeywords(fallback.keywords || []);
+        setAdvice(fallback.advice);
+        setTranslation(fallback.translation);
+        setEditableSymptoms(fallback.symptoms);
+      }
+    } catch (err) {
+      console.warn("Backend OpenRouter LLM call error, using local fallback:", err);
+      const fallback = analyzeClinicalText(textToAnalyze, selectedLanguage);
+      setUrgency(fallback.urgency);
+      setSymptoms(fallback.symptoms);
+      setKeywords(fallback.keywords || []);
+      setAdvice(fallback.advice);
+      setTranslation(fallback.translation);
+      setEditableSymptoms(fallback.symptoms);
+    }
+
     setVerificationStep(false);
     setTriageStep('completed');
   };
@@ -396,6 +432,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
         transcript,
         translation,
         urgency,
+        keywords,
         symptoms: editableSymptoms.length > 0 ? editableSymptoms : symptoms,
         advice,
         // Blockchain anchoring details
@@ -417,7 +454,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       `*Profile:* ${patient ? `${patient.age}y · ${patient.gender}` : 'Not registered'}\n` +
       `*Village:* ${patient?.village || 'Rampur'}\n` +
       `*Urgency Level:* ${alertSymbol}\n\n` +
-      `*Spoken symptoms:* "${transcript}"\n\n` +
+      `*Spoken Voice:* "${transcript}"\n` +
+      `*Key Words:* ${keywords.length > 0 ? keywords.join(', ') : 'N/A'}\n` +
+      `*Extracted Symptoms:* ${(editableSymptoms.length > 0 ? editableSymptoms : symptoms).join(', ')}\n\n` +
       `*English Summary:* "${translation}"\n\n` +
       `*Recommended Actions:* ${advice}\n` +
       `----------------------------------------\n` +
@@ -508,32 +547,51 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               )}
               {/* Manual Input UI */}
               {inputMode === 'manual' && (
-                <div className="space-y-4 max-w-md mx-auto">
+                <div className="space-y-5 max-w-md mx-auto py-4 text-left">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Spoken Voice (Original)</label>
-                    <textarea value={transcript} onChange={e => setTranscript(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">English Translation (AI)</label>
-                    <textarea value={translation} onChange={e => setTranslation(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Urgency Level</label>
-                    <select value={urgency} onChange={e => setUrgency(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]">
-                      <option value="Green">Green</option>
-                      <option value="Yellow">Yellow</option>
-                      <option value="Red">Red</option>
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">1. Select Language</label>
+                    <select 
+                      value={selectedLanguage} 
+                      onChange={(e) => setSelectedLanguage(e.target.value)} 
+                      className="w-full p-3 rounded-xl border border-slate-300 bg-white font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer"
+                    >
+                      {INDIAN_LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.name}</option>
+                      ))}
                     </select>
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Symptoms (one per line)</label>
-                    <textarea value={symptoms.join('\n')} onChange={e => setSymptoms(e.target.value.split('\n').filter(s => s.trim() !== ''))} rows={4} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">
+                      2. Type Patient Symptom Description
+                    </label>
+                    <textarea 
+                      value={manualText} 
+                      onChange={e => setManualText(e.target.value)} 
+                      rows={4} 
+                      placeholder="e.g. मरीज को दो दिन से तेज सिर दर्द है और उल्टी हो रही है (or type symptoms in Hindi, English, Marathi)..." 
+                      className="w-full p-3.5 rounded-2xl border-2 border-slate-200 shadow-sm focus:border-[#E07A5F] focus:ring-1 focus:ring-[#E07A5F] text-slate-800 text-sm font-medium" 
+                    />
+                    <p className="text-xs text-slate-400 mt-1.5">
+                      Enter the patient's symptoms in plain text. The AI will extract key words, symptoms, classify urgency (Green/Yellow/Red), and suggest precautions.
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Advice / Recommendations</label>
-                    <textarea value={advice} onChange={e => setAdvice(e.target.value)} rows={3} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
-                  </div>
-                  <button onClick={() => { setVerificationStep(false); setEditableSymptoms(symptoms); setTriageStep('completed'); }} className="mt-2 px-4 py-2 bg-[#0A2540] text-white rounded hover:bg-[#123152]">Submit Manual Entry</button>
+
+                  <button 
+                    onClick={() => {
+                      const trimmed = manualText.trim();
+                      if (!trimmed) {
+                        alert("Please enter patient symptom description first.");
+                        return;
+                      }
+                      setTriageStep('analyzing');
+                      finishTriageAnalysis(trimmed);
+                    }} 
+                    className="w-full py-3.5 bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Analyze Symptoms & Classify Urgency
+                  </button>
                 </div>
               )}
             </>
@@ -785,6 +843,26 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   Share Referral Slip
                 </a>
               </div>
+
+              {/* Extracted Key Words */}
+              {keywords && keywords.length > 0 && (
+                <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
+                  <h4 className="text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    Extracted Key Words ({keywords.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {keywords.map((kw, idx) => (
+                      <span 
+                        key={idx} 
+                        className="px-3 py-1 bg-white border border-indigo-200 text-indigo-950 text-xs font-bold rounded-lg shadow-xs flex items-center gap-1"
+                      >
+                        <span className="text-indigo-500">🔑</span> {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Detected Symptoms */}
               <div>
