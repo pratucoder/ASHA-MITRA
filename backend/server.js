@@ -382,14 +382,32 @@ app.post('/api/speech-to-text', async (req, res) => {
       });
     }
 
-    // Convert base64 data to Blob Buffer
-    const base64Data = audio.replace(/^data:audio\/\w+;base64,/, '');
+    // Convert base64 data to Blob Buffer safely
+    let base64Data = audio;
+    let mimeType = 'audio/webm';
+    let filename = 'audio.webm';
+
+    if (typeof audio === 'string' && audio.includes(',')) {
+      const parts = audio.split(',');
+      base64Data = parts[1];
+      const mimeMatch = parts[0].match(/data:([^;]+);/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1].split(';')[0]; // Extract base mimeType without codecs parameter
+        if (mimeType.includes('mp4') || mimeType.includes('m4a')) filename = 'audio.mp4';
+        else if (mimeType.includes('wav')) filename = 'audio.wav';
+        else if (mimeType.includes('ogg')) filename = 'audio.ogg';
+        else if (mimeType.includes('mp3')) filename = 'audio.mp3';
+      }
+    } else if (typeof audio === 'string') {
+      base64Data = audio.replace(/^data:[^;]+;base64,/, '');
+    }
+
     const buffer = Buffer.from(base64Data, 'base64');
-    const audioBlob = new Blob([buffer], { type: 'audio/webm' });
+    const audioBlob = new Blob([buffer], { type: mimeType });
 
     // Build multipart/form-data for Sarvam STT API
     const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.webm');
+    formData.append('file', audioBlob, filename);
     formData.append('model', 'saaras:v3');
 
     // Language code mapping (hi-IN, en-IN, mr-IN)

@@ -12,6 +12,7 @@ const INDIAN_LANGUAGES = [
 const SYMPTOM_PRESETS = [
   {
     lang: 'hi',
+    title: 'Infant High Fever & Respiratory Distress (Hindi)',
     transcript: "बच्चे को तीन दिन से तेज बुखार है, सांस लेने में तकलीफ हो रही है और वो कुछ खा नहीं रहा है।",
     translation: "Child has high fever for three days, is having difficulty breathing, and is not eating anything.",
     urgency: 'Red',
@@ -20,6 +21,7 @@ const SYMPTOM_PRESETS = [
   },
   {
     lang: 'hi',
+    title: 'Severe Chest Pain & Sweating (Hindi)',
     transcript: "छाती में बहुत तेज दर्द हो रहा है, ऐसा लग रहा है जैसे कोई वजन रख दिया हो और बाएँ हाथ में दर्द जा रहा है। पसीना भी आ रहा है।",
     translation: "Experiencing severe chest pain, feeling like a heavy weight is on the chest, and pain is radiating to the left arm. Also sweating profusely.",
     urgency: 'Red',
@@ -28,7 +30,8 @@ const SYMPTOM_PRESETS = [
   },
   {
     lang: 'mr',
-    transcript: "काल संध्याकाळपासून उलट्या आणि जुलाब होत आहेत. खूप अशक्तपणा जाणवत आहे आणि वारंवार तहान लागत आहे.",
+    title: 'Vomiting & Dehydration (Marathi)',
+    transcript: "काल संध्याकाळपासून उलट्या आणि जुलाब होत आहेत. खूप अशक्तपणा जाणवत आहे आणि वारंवार तहान लागत आहे।",
     translation: "Having vomiting and loose motions since yesterday evening. Feeling very weak and frequently thirsty.",
     urgency: 'Yellow',
     symptoms: ['Acute Gastroenteritis', 'Moderate Dehydration', 'General Weakness'],
@@ -36,6 +39,7 @@ const SYMPTOM_PRESETS = [
   },
   {
     lang: 'en',
+    title: 'Mild Sore Throat & Cold (English)',
     transcript: "I have a mild sore throat and a slight runny nose since this morning. No fever or body aches.",
     translation: "I have a mild sore throat and a slight runny nose since this morning. No fever or body aches.",
     urgency: 'Green',
@@ -49,6 +53,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const [triageStep, setTriageStep] = useState('idle'); // idle, recording, analyzing, completed, anchoring
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState(null);
+  const [speechNotice, setSpeechNotice] = useState('');
   
   // Real-time voice triage states
   const [transcript, setTranscript] = useState('');
@@ -79,6 +84,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   const audioChunksRef = useRef([]);
   const speechRecognitionRef = useRef(null);
   const recordedBase64Ref = useRef('');
+  const transcriptRef = useRef('');
 
   useEffect(() => {
     if (!isOpen) {
@@ -86,6 +92,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       setRecordingSeconds(0);
       setSelectedPreset(null);
       setTranscript('');
+      transcriptRef.current = '';
       setTranslation('');
       setManualText('');
       setKeywords([]);
@@ -203,26 +210,30 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
   };
 
   const startRecording = async () => {
+    // 1. INSTANT UI FEEDBACK: Immediately enter recording state
     setTriageStep('recording');
     setRecordingSeconds(0);
     setTranscript('');
+    transcriptRef.current = '';
     setTranslation('');
     setSttProvider('');
+    setSpeechNotice('');
     audioChunksRef.current = [];
 
     // Timer for display
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setRecordingSeconds(prev => prev + 1);
     }, 1000);
 
-    // 1. Web Speech API for real-time live preview text
+    // 2. Start Web Speech API for real-time live preview text
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-US';
+        recognition.lang = selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-IN';
         recognition.onresult = (event) => {
           let currentText = '';
           for (let i = 0; i < event.results.length; i++) {
@@ -230,20 +241,37 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           }
           if (currentText) {
             setTranscript(currentText);
+            transcriptRef.current = currentText;
           }
         };
-        recognition.start();
-        speechRecognitionRef.current = recognition;
+        recognition.onerror = (err) => {
+          console.warn("Web Speech API notice:", err.error);
+        };
+        try {
+          recognition.start();
+          speechRecognitionRef.current = recognition;
+        } catch (e) {
+          console.warn("SpeechRecognition start notice:", e);
+        }
       }
     } catch (err) {
       console.warn("Web Speech API not available:", err);
     }
 
-    // 2. MediaRecorder for Sarvam STT Audio File
+    // 3. Acquire Microphone Stream safely for MediaRecorder (Sarvam AI STT)
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? { mimeType: 'audio/webm;codecs=opus' }
+          : MediaRecorder.isTypeSupported('audio/webm')
+          ? { mimeType: 'audio/webm' }
+          : MediaRecorder.isTypeSupported('audio/mp4')
+          ? { mimeType: 'audio/mp4' }
+          : {};
+
+        const mediaRecorder = new MediaRecorder(mediaStream, options);
         mediaRecorderRef.current = mediaRecorder;
 
         mediaRecorder.ondataavailable = (e) => {
@@ -252,10 +280,22 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           }
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(200);
       }
     } catch (err) {
-      console.warn("Microphone hardware access notice:", err);
+      console.error("Microphone getUserMedia error:", err);
+      if (!transcriptRef.current) {
+        const errName = err.name || 'MicrophoneError';
+        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+          setTriageStep('idle');
+          setSpeechNotice("⚠️ Microphone permission denied by browser. Please allow microphone access in site settings.");
+          if (timerRef.current) clearInterval(timerRef.current);
+        } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+          setTriageStep('idle');
+          setSpeechNotice("⚠️ Microphone is currently in use by another app or hardware system. Please close other voice apps.");
+          if (timerRef.current) clearInterval(timerRef.current);
+        }
+      }
     }
   };
 
@@ -270,19 +310,41 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
     // Stop MediaRecorder and process audio with Sarvam AI STT API
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
       mediaRecorderRef.current.onstop = async () => {
         // Stop audio stream tracks
         if (mediaRecorderRef.current.stream) {
           mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
         }
 
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await processSarvamSTT(audioBlob);
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+        if (audioBlob.size > 0) {
+          await processSarvamSTT(audioBlob);
+        } else {
+          const captured = (transcriptRef.current || transcript || '').trim();
+          if (captured) {
+            finishTriageAnalysis(captured);
+          } else {
+            setTriageStep('idle');
+            setSpeechNotice("⚠️ Microphone captured 0 bytes of audio. Please speak clearly into your mic.");
+          }
+        }
       };
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.warn("MediaRecorder stop notice:", e);
+      }
     } else {
       // Fallback analysis if MediaRecorder didn't capture chunks
-      finishTriageAnalysis(transcript);
+      const captured = (transcriptRef.current || transcript || '').trim();
+      if (captured) {
+        finishTriageAnalysis(captured);
+      } else {
+        setTriageStep('idle');
+        setSpeechNotice("⚠️ Microphone capture failed to start. Please check microphone hardware permissions and try again.");
+      }
     }
   };
 
@@ -306,48 +368,54 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
         const data = await response.json();
 
         if (response.ok && data.transcript && data.transcript.trim()) {
+          setSpeechNotice('');
           setSttProvider('Sarvam AI Speech-to-Text');
           setTranscript(data.transcript);
+          transcriptRef.current = data.transcript;
           finishTriageAnalysis(data.transcript);
         } else {
           // Fallback to Web Speech API text if captured from live microphone
-          const textToUse = (transcript || '').trim();
+          const textToUse = (transcriptRef.current || transcript || '').trim();
           if (textToUse) {
+            setSpeechNotice('');
             setSttProvider('Web Speech API');
             finishTriageAnalysis(textToUse);
           } else {
             setTriageStep('idle');
-            alert("No speech text was recognized. Please click the mic and speak clearly, or enter symptoms using Manual Input.");
+            const detail = data.error || "No speech detected";
+            setSpeechNotice(`⚠️ Sarvam STT: ${detail}. Please speak clearly into your mic and try again.`);
           }
         }
       };
     } catch (err) {
       console.warn("Sarvam STT backend request error:", err);
-      const textToUse = (transcript || '').trim();
+      const textToUse = (transcriptRef.current || transcript || '').trim();
       if (textToUse) {
+        setSpeechNotice('');
         setSttProvider('Web Speech API');
         finishTriageAnalysis(textToUse);
       } else {
         setTriageStep('idle');
-        alert("Speech-to-text service unavailable. Please speak again or use Manual Input.");
+        setSpeechNotice("⚠️ Speech-to-text service unavailable. Please check your mic connection and try again.");
       }
     }
   };
 
   const getLanguagePresetText = () => {
-    const matched = SYMPTOM_PRESETS.find(p => p.lang === selectedLanguage) || SYMPTOM_PRESETS[0];
-    return matched.transcript;
+    return '';
   };
 
   const finishTriageAnalysis = async (finalText) => {
-    const textToAnalyze = (finalText || transcript || '').trim();
+    const textToAnalyze = (finalText || transcriptRef.current || transcript || '').trim();
     if (!textToAnalyze) {
       setTriageStep('idle');
-      alert("No speech input was received. Please record again or type the symptoms manually.");
+      setSpeechNotice("⚠️ No speech text was received. Please record again or type symptoms manually.");
       return;
     }
+    setSpeechNotice('');
 
     setTranscript(textToAnalyze);
+    transcriptRef.current = textToAnalyze;
 
     try {
       const res = await fetch('http://localhost:3000/api/analyze-triage', {
@@ -515,9 +583,18 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
             <>
               {/* Voice Input UI */}
               {inputMode === 'voice' && (
-                <div className="text-center py-8">
-                  <div className="max-w-md mx-auto mb-8">
-                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-3 text-left">1. Select Spoken Language</label>
+                <div className="text-center py-6">
+                  {speechNotice && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 mb-6 text-left max-w-md mx-auto flex items-start gap-3 shadow-sm">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-900 font-semibold leading-relaxed">
+                        {speechNotice}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="max-w-md mx-auto mb-6">
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2.5 text-left">1. Select Spoken Language</label>
                     <div className="relative">
                       <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                       <select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value)} className="w-full min-h-[56px] pl-12 pr-10 rounded-2xl border-2 border-slate-200 bg-white text-lg font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer hover:bg-slate-50 transition-all">
@@ -532,15 +609,16 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                       <div className="absolute inset-0 rounded-full bg-[#E07A5F] opacity-20 animate-ping group-hover:opacity-30"></div>
                       <Mic className="w-10 h-10" />
                     </button>
-                    <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-6">Start Voice Triage</h4>
-                    <p className="text-slate-500 mt-2 max-w-sm">Click the microphone, then instruct the patient to describe their symptoms in their native tongue.</p>
+                    <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-5">Start Voice Triage</h4>
+                    <p className="text-slate-500 mt-2 text-xs max-w-sm">Tap the microphone and speak the patient's symptoms clearly in your native tongue.</p>
                   </div>
+
                   <div className="bg-[#FDFBF7] border border-slate-200 rounded-2xl p-4 mt-6 max-w-md mx-auto text-left">
-                    <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Instructions</h5>
-                    <ul className="text-sm text-slate-600 space-y-1.5 list-disc pl-4">
-                      <li>Hold the phone within 1 foot of the patient's mouth.</li>
-                      <li>Ensure background noise is minimized.</li>
-                      <li>Our AI automatically translates regional dialects to clinical English.</li>
+                    <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Microphone Voice Recording</h5>
+                    <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
+                      <li>Hold device close and speak clearly into the microphone.</li>
+                      <li>Sarvam AI STT & Web Speech API will transcribe your exact spoken voice.</li>
+                      <li>AI automatically translates regional dialects to clinical English.</li>
                     </ul>
                   </div>
                 </div>
@@ -617,16 +695,18 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
               <div className="flex items-center gap-2 text-2xl font-bold font-mono text-[#0A2540] mb-8">
                 <Clock className="w-6 h-6 text-[#E07A5F]" />
-                00:0{recordingSeconds}
+                {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}
               </div>
 
-              <button 
-                onClick={() => stopRecording(null)}
-                className="px-8 py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold flex items-center gap-3 transition-colors shadow-md"
-              >
-                <MicOff className="w-5 h-5" />
-                Stop & Analyze
-              </button>
+              <div className="flex items-center gap-3 w-full max-w-sm justify-center mb-4">
+                <button 
+                  onClick={() => stopRecording()}
+                  className="px-8 py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2.5 transition-colors shadow-md text-sm active:scale-95"
+                >
+                  <MicOff className="w-4 h-4" />
+                  Stop & Analyze Voice
+                </button>
+              </div>
 
               {transcript && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-w-md w-full mb-4 text-xs font-mono text-slate-700 text-left">
