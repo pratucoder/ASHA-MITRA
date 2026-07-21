@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, Languages, Clock, Volume2, MapPin, Phone, ExternalLink } from 'lucide-react';
+import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Languages, Clock, Volume2, MapPin, Phone, ExternalLink } from 'lucide-react';
 import { generateSHA256, generateTxHash } from '../blockchain/crypto';
 import { getNearbyHospitals, getNearbyHospitalsAsync } from '../utils/hospitals';
 
@@ -732,14 +732,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
           {triageStep === 'completed' && (
             <div className="space-y-6 fade-in-view text-left">
-              {sttProvider && (
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0A2540]/5 border border-[#0A2540]/10 rounded-full text-xs font-semibold text-[#0A2540]">
-                  <Sparkles className="w-3.5 h-3.5 text-[#E07A5F]" />
-                  <span>Engine: {sttProvider}</span>
-                </div>
-              )}
-
-                {/* Verify Symptoms Button */}
+              {/* Verify Symptoms Button */}
                 {verificationStep ? (
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-slate-700">Edit Symptoms (one per line)</label>

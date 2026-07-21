@@ -225,7 +225,7 @@ Patient Description: "${text}"`;
       symptoms: Array.isArray(parsed.symptoms) ? parsed.symptoms : [],
       urgency: ['Red', 'Yellow', 'Green'].includes(parsed.urgency) ? parsed.urgency : 'Green',
       advice: parsed.advice || 'Advise rest, fluid intake, and monitor symptoms.',
-      translation: typeof parsed.translation === 'string' ? parsed.translation : (parsed.translation?.en?.patient_description || parsed.translation?.patient_description || text),
+       translation: typeof parsed.translation === 'string' ? parsed.translation : (parsed.translation?.en?.patient_description || parsed.translation?.patient_description || text),
       provider: `OpenRouter (${model})`
     };
   } catch (error) {
