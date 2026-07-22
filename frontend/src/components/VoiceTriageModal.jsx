@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Languages, Clock, Volume2, MapPin, Phone, ExternalLink } from 'lucide-react';
 import { generateSHA256, generateTxHash } from '../blockchain/crypto';
 import { getNearbyHospitals, getNearbyHospitalsAsync } from '../utils/hospitals';
+import { API_BASE_URL } from '../config';
 
 const INDIAN_LANGUAGES = [
   { code: 'hi', sarvamCode: 'hi-IN', name: 'हिन्दी · Hindi' },
@@ -356,7 +357,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
         const base64Audio = reader.result;
         recordedBase64Ref.current = base64Audio;
 
-        const response = await fetch('http://localhost:3000/api/speech-to-text', {
+        const response = await fetch(`${API_BASE_URL}/api/speech-to-text`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -418,7 +419,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
     transcriptRef.current = textToAnalyze;
 
     try {
-      const res = await fetch('http://localhost:3000/api/analyze-triage', {
+      const res = await fetch(`${API_BASE_URL}/api/analyze-triage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

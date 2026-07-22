@@ -12,6 +12,7 @@ import VoiceTriageModal from './components/VoiceTriageModal';
 import HospitalsMap from './components/HospitalsMap';
 import { getNearbyHospitals, registerDynamicVillage, reverseGeocode } from './utils/hospitals';
 import './App.css';
+import { API_BASE_URL } from './config';
 
 // Seed initial history data for ANM Supervisor cluster view
 const SEED_TRIAGES = [
@@ -179,7 +180,7 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUserData),
@@ -247,7 +248,7 @@ function App() {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,7 +301,7 @@ function App() {
   useEffect(() => {
     if (user) {
       // Fetch Patients
-      fetch('http://localhost:3000/api/patients')
+      fetch(`${API_BASE_URL}/api/patients`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && Array.isArray(data) && data.length > 0) {
@@ -310,7 +311,7 @@ function App() {
         .catch(err => console.warn('Could not fetch patients from backend, using local:', err));
 
       // Fetch Triage History
-      fetch('http://localhost:3000/api/triage')
+      fetch(`${API_BASE_URL}/api/triage`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && Array.isArray(data) && data.length > 0) {
@@ -324,7 +325,7 @@ function App() {
   const handleAddPatient = async (patientData, andStartTriage) => {
     let createdPatient = null;
     try {
-      const response = await fetch('http://localhost:3000/api/patients', {
+      const response = await fetch(`${API_BASE_URL}/api/patients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -368,7 +369,7 @@ function App() {
 
     let newTriageRecord = null;
     try {
-      const response = await fetch('http://localhost:3000/api/triage', {
+      const response = await fetch(`${API_BASE_URL}/api/triage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
