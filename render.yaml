@@ -1,0 +1,82 @@
+# Render Blueprint Specification for ASHA Mitra
+# Refer to https://render.com/docs/blueprints for details.
+# To deploy, connect your GitHub repository to Render and click "New" -> "Blueprint".
+
+services:
+  # =========================================================================
+  # OPTION 1: MONOLITHIC DEPLOYMENT (Recommended - Free Tier & Single Service)
+  # =========================================================================
+  - type: web
+    name: asha-mitra-monolith
+    env: node
+    plan: free
+    # Installs all deps (backend + frontend) and builds the React frontend
+    buildCommand: npm install && npm run build
+    # Starts the backend express server which also serves the built frontend
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: MONGODB_URI
+        sync: false
+        placeholder: "Your MongoDB Atlas connection URI (e.g. mongodb+srv://...)"
+      - key: JWT_SECRET
+        sync: false
+        generateValue: true # Generates a secure random key automatically
+      - key: SARVAM_API_KEY
+        sync: false
+        placeholder: "Your Sarvam Speech API Key"
+      - key: OPENROUTER_API_KEY
+        sync: false
+        placeholder: "Your OpenRouter API Key"
+      - key: OPENROUTER_MODEL
+        value: "google/gemini-2.5-flash"
+      - key: FRONTEND_URL
+        sync: false
+        placeholder: "Optional: Custom domain or custom HTTP-Referer URL"
+
+  # =========================================================================
+  # OPTION 2: SPLIT SERVICES (If you want separate Web App and Backend API)
+  # =========================================================================
+  
+  # 2A. BACKEND WEB SERVICE
+  - type: web
+    name: asha-mitra-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: MONGODB_URI
+        sync: false
+        placeholder: "Your MongoDB Atlas connection URI"
+      - key: JWT_SECRET
+        sync: false
+        generateValue: true
+      - key: SARVAM_API_KEY
+        sync: false
+        placeholder: "Your Sarvam Speech API Key"
+      - key: OPENROUTER_API_KEY
+        sync: false
+        placeholder: "Your OpenRouter API Key"
+      - key: OPENROUTER_MODEL
+        value: "google/gemini-2.5-flash"
+      - key: FRONTEND_URL
+        sync: false
+        placeholder: "URL of your deployed frontend (e.g. https://asha-mitra-frontend.onrender.com)"
+
+  # 2B. FRONTEND STATIC SITE
+  - type: static
+    name: asha-mitra-frontend
+    env: static
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+        placeholder: "The URL of your backend (e.g. https://asha-mitra-backend.onrender.com)"

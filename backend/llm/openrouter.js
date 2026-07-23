@@ -187,7 +187,7 @@ Patient Description: "${text}"`;
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://asha-mitra.vercel.app',
+        'HTTP-Referer': process.env.FRONTEND_URL || 'https://asha-mitra.onrender.com',
         'X-Title': 'ASHA Mitra AI Triage',
         'Content-Type': 'application/json'
       },
