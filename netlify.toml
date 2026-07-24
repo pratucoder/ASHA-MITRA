@@ -1,0 +1,18 @@
+# Netlify configuration file for ASHA Mitra frontend in subdirectory
+# This file is placed in the root directory of the repository.
+
+[build]
+  # The directory where Netlify runs the build command and looks for package.json
+  base = "frontend"
+
+  # The command Netlify runs to build the frontend
+  command = "npm run build"
+
+  # The directory containing the built static files to be deployed, relative to the base directory
+  publish = "dist"
+
+# SPA redirect rule: redirects all paths to index.html for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
