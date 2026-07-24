@@ -530,6 +530,18 @@ if (fs.existsSync(frontendBuildPath)) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendBuildPath, 'index.html'));
   });
+} else {
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      status: "online",
+      message: "ASHA Mitra API Server is running successfully. If you are looking for the frontend interface, please visit your deployed frontend URL.",
+      endpoints: {
+        health: "/api/health",
+        patients: "/api/patients",
+        triage: "/api/triage"
+      }
+    });
+  });
 }
 
 app.listen(PORT, () => {
