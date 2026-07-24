@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, MicOff, AlertCircle, CheckCircle2, AlertTriangle, Languages, Clock, Volume2, MapPin, Phone, ExternalLink, Sparkles } from 'lucide-react';
 import { generateSHA256, generateTxHash } from '../blockchain/crypto';
 import { getNearbyHospitals, getNearbyHospitalsAsync } from '../utils/hospitals';
+import { useLanguage } from '../context/LanguageContext';
 import { API_BASE_URL } from '../config';
 
 const INDIAN_LANGUAGES = [
@@ -50,6 +51,7 @@ const SYMPTOM_PRESETS = [
 ];
 
 export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriage, userCoords }) {
+  const { t } = useLanguage();
   const [selectedLanguage, setSelectedLanguage] = useState('hi');
   const [triageStep, setTriageStep] = useState('idle'); // idle, recording, analyzing, completed, anchoring
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -552,10 +554,10 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               <Sparkles className="w-5 h-5 text-[#E07A5F]" />
             </div>
             <div>
-              <h3 className="font-heading font-extrabold text-lg">AI Voice Triage</h3>
+              <h3 className="font-heading font-extrabold text-lg">{t('ai_voice_triage')}</h3>
               <p className="text-xs text-white/70">
-                Patient: <span className="font-bold text-[#E07A5F]">{patient?.name || 'New Triage'}</span>
-                {patient && ` (${patient.age}y · ${patient.gender})`}
+                {t('patient')}: <span className="font-bold text-[#E07A5F]">{patient?.name || t('new_triage')}</span>
+                {patient && ` (${patient.age}y · ${patient.gender === 'Female' ? t('female').toLowerCase() : patient.gender === 'Male' ? t('male').toLowerCase() : t('other').toLowerCase()})`}
               </p>
             </div>
           </div>
@@ -574,13 +576,13 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           onClick={() => setInputMode('voice')}
           className={`px-4 py-2 rounded ${inputMode === 'voice' ? 'bg-[#E07A5F] text-white' : 'bg-gray-200 text-gray-800'}`}
         >
-          Voice Input
+          {t('voice_input')}
         </button>
         <button
           onClick={() => setInputMode('manual')}
           className={`px-4 py-2 rounded ${inputMode === 'manual' ? 'bg-[#E07A5F] text-white' : 'bg-gray-200 text-gray-800'}`}
         >
-          Manual Input
+          {t('manual_input')}
         </button>
       </div>
 
@@ -601,7 +603,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   )}
 
                   <div className="max-w-md mx-auto mb-6">
-                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2.5 text-left">1. Select Spoken Language</label>
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2.5 text-left">{t('select_spoken_lang')}</label>
                     <div className="relative">
                       <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                       <select value={selectedLanguage} onChange={(e) => setSelectedLanguage(e.target.value)} className="w-full min-h-[56px] pl-12 pr-10 rounded-2xl border-2 border-slate-200 bg-white text-lg font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer hover:bg-slate-50 transition-all">
@@ -616,16 +618,16 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                       <div className="absolute inset-0 rounded-full bg-[#E07A5F] opacity-20 animate-ping group-hover:opacity-30"></div>
                       <Mic className="w-10 h-10" />
                     </button>
-                    <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-5">Start Voice Triage</h4>
-                    <p className="text-slate-500 mt-2 text-xs max-w-sm">Tap the microphone and speak the patient's symptoms clearly in your native tongue.</p>
+                    <h4 className="font-heading font-extrabold text-[#0A2540] text-xl mt-5">{t('start_voice_triage')}</h4>
+                    <p className="text-slate-500 mt-2 text-xs max-w-sm">{t('mic_hint_desc')}</p>
                   </div>
 
                   <div className="bg-[#FDFBF7] border border-slate-200 rounded-2xl p-4 mt-6 max-w-md mx-auto text-left">
-                    <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Microphone Voice Recording</h5>
+                    <h5 className="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">{t('mic_recording')}</h5>
                     <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-4">
-                      <li>Hold device close and speak clearly into the microphone.</li>
-                      <li>Sarvam AI STT & Web Speech API will transcribe your exact spoken voice.</li>
-                      <li>AI automatically translates regional dialects to clinical English.</li>
+                      <li>{t('mic_tip_1')}</li>
+                      <li>{t('mic_tip_2')}</li>
+                      <li>{t('mic_tip_3')}</li>
                     </ul>
                   </div>
                 </div>
@@ -634,7 +636,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               {inputMode === 'manual' && (
                 <div className="space-y-5 max-w-md mx-auto py-4 text-left">
                   <div>
-                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">1. Select Language</label>
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('select_language')}</label>
                     <select 
                       value={selectedLanguage} 
                       onChange={(e) => setSelectedLanguage(e.target.value)} 
@@ -648,17 +650,17 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
                   <div>
                     <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">
-                      2. Type Patient Symptom Description
+                      {t('type_description')}
                     </label>
                     <textarea 
                       value={manualText} 
                       onChange={e => setManualText(e.target.value)} 
                       rows={4} 
-                      placeholder="e.g. मरीज को दो दिन से तेज सिर दर्द है और उल्टी हो रही है (or type symptoms in Hindi, English, Marathi)..." 
+                      placeholder={t('manual_placeholder')} 
                       className="w-full p-3.5 rounded-2xl border-2 border-slate-200 shadow-sm focus:border-[#E07A5F] focus:ring-1 focus:ring-[#E07A5F] text-slate-800 text-sm font-medium" 
                     />
                     <p className="text-xs text-slate-400 mt-1.5">
-                      Enter the patient's symptoms in plain text. The AI will extract key words, symptoms, classify urgency (Green/Yellow/Red), and suggest precautions.
+                      {t('manual_hint')}
                     </p>
                   </div>
 
@@ -675,7 +677,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                     className="w-full py-3.5 bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
                   >
                     <Sparkles className="w-4 h-4" />
-                    Analyze Symptoms & Classify Urgency
+                    {t('analyze_btn')}
                   </button>
                 </div>
               )}
@@ -686,7 +688,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
             <div className="text-center py-10 flex flex-col items-center justify-center">
               <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full font-bold text-xs tracking-wider uppercase mb-6 animate-pulse">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-600"></span>
-                Recording patient voice...
+                {t('recording_voice')}
               </div>
 
               <div className="flex items-center justify-center gap-1.5 h-20 mb-8 w-full max-w-xs">
@@ -711,18 +713,18 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   className="px-8 py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2.5 transition-colors shadow-md text-sm active:scale-95"
                 >
                   <MicOff className="w-4 h-4" />
-                  Stop & Analyze Voice
+                  {t('stop_analyze')}
                 </button>
               </div>
 
               {transcript && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-w-md w-full mb-4 text-xs font-mono text-slate-700 text-left">
-                  <span className="font-bold text-[#E07A5F]">Live Preview: </span>"{transcript}"
+                  <span className="font-bold text-[#E07A5F]">{t('live_preview')}: </span>"{transcript}"
                 </div>
               )}
 
               <p className="text-xs text-slate-400 mt-2 italic">
-                Capturing live microphone audio for Sarvam AI Speech Recognition...
+                {t('capturing_mic')}
               </p>
             </div>
           )}
@@ -730,9 +732,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           {triageStep === 'analyzing' && (
             <div className="text-center py-16 flex flex-col items-center justify-center">
               <div className="w-16 h-16 border-4 border-[#E07A5F]/20 border-t-[#E07A5F] rounded-full animate-spin mb-6"></div>
-              <h4 className="font-heading font-extrabold text-[#0A2540] text-xl">ASHA Saathi AI Triage at Work</h4>
+              <h4 className="font-heading font-extrabold text-[#0A2540] text-xl">{t('ai_at_work')}</h4>
               <p className="text-slate-500 mt-2 max-w-sm">
-                Transcribing regional audio, translating to English, and applying diagnostic protocols...
+                {t('ai_work_desc')}
               </p>
             </div>
           )}
@@ -742,9 +744,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               {/* Verify Symptoms Button */}
                 {verificationStep ? (
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">Edit Symptoms (one per line)</label>
+                    <label className="block text-sm font-medium text-slate-700">{t('edit_symptoms_label')}</label>
                     <textarea value={editableSymptoms.join('\n')} onChange={e => setEditableSymptoms(e.target.value.split('\n').filter(s => s.trim() !== ''))} rows={4} className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[#E07A5F] focus:ring-[#E07A5F]" />
-                    <button onClick={() => { setVerificationStep(false); setSymptoms(editableSymptoms); }} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">Done Editing</button>
+                    <button onClick={() => { setVerificationStep(false); setSymptoms(editableSymptoms); }} className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">{t('done_editing')}</button>
                   </div>
                 ) : (
                   <button
@@ -754,7 +756,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                     }}
                     className="mt-4 px-4 py-2 bg-[#0A2540] text-white rounded hover:bg-[#123152]"
                   >
-                    Verify & Edit Symptoms
+                    {t('verify_edit_symptoms')}
                   </button>
                 )}
               {/* Urgency Classification Header */}
@@ -771,7 +773,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                 
                 <div className="flex-grow">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase font-extrabold tracking-wider opacity-60">AI Urgency Level</span>
+                    <span className="text-xs uppercase font-extrabold tracking-wider opacity-60">{t('ai_urgency_level')}</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
                       urgency === 'Red' 
                         ? 'bg-red-600 text-white' 
@@ -779,15 +781,15 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                         ? 'bg-amber-500 text-white'
                         : 'bg-green-600 text-white'
                     }`}>
-                      {urgency} Alert
+                      {(urgency === 'Red' ? t('red') : urgency === 'Yellow' ? t('yellow') : t('green'))} {t('alert_suffix')}
                     </span>
                   </div>
                   <h4 className="font-heading font-extrabold text-lg mt-1">
                     {urgency === 'Red' 
-                      ? 'Immediate Referral Needed' 
+                      ? t('immediate_referral') 
                       : urgency === 'Yellow'
-                      ? 'ANM Assessment Required'
-                      : 'Home Care & Monitoring'}
+                      ? t('anm_assessment')
+                      : t('home_care')}
                   </h4>
                   <p className="text-sm mt-1 opacity-80">{advice}</p>
                 </div>
@@ -799,7 +801,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   <div className="flex items-center justify-between border-b border-red-100 pb-3">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-5 h-5 text-red-600 animate-bounce" />
-                      <h4 className="font-heading font-extrabold text-[#0A2540] text-sm md:text-base">🚨 Emergency Nearby Hospitals</h4>
+                      <h4 className="font-heading font-extrabold text-[#0A2540] text-sm md:text-base">🚨 {t('nearby_emergency')}</h4>
                     </div>
                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm border ${
                       gpsState === 'loading' 
@@ -815,13 +817,13 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                           ? 'bg-green-500' 
                           : 'bg-slate-400'
                       }`}></span>
-                      {gpsState === 'loading' ? 'Locating GPS...' : gpsState === 'success' ? 'GPS Active' : 'Village Fallback'}
+                      {gpsState === 'loading' ? t('gps_fetching') : gpsState === 'success' ? t('gps_success') : t('village_fallback')}
                     </span>
                   </div>
 
                   <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                     {nearbyHospitals.length === 0 ? (
-                      <div className="text-center py-4 text-xs text-slate-400">Locating regional medical services...</div>
+                      <div className="text-center py-4 text-xs text-slate-400">{t('hospital_rec_desc')}</div>
                     ) : (
                       nearbyHospitals.map((hosp, idx) => {
                         const isSelected = selectedHospital?.id === hosp.id;
@@ -836,12 +838,12 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                                 <span className="font-bold text-[#0A2540] text-sm">{hosp.name}</span>
                                 {idx === 0 && (
                                   <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-wider rounded">
-                                    Nearest
+                                    {t('nearest')}
                                   </span>
                                 )}
                               </div>
                               <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded">
-                                {hosp.distance} km away
+                                {hosp.distance} {t('km_away')}
                               </span>
                             </div>
 
@@ -851,7 +853,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                                 className="p-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-all border border-green-200 flex items-center justify-center gap-1 text-xs font-bold animate-pulse hover:animate-none"
                               >
                                 <Phone className="w-3.5 h-3.5" />
-                                <span>Call ER</span>
+                                <span>{t('call_er')}</span>
                               </a>
                               <a 
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
@@ -860,7 +862,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                                 className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1 text-xs font-bold"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
-                                <span>Map</span>
+                                <span>{t('map')}</span>
                               </a>
                               <button
                                 onClick={() => handleSelectHospital(hosp)}
@@ -871,7 +873,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                                 }`}
                               >
                                 {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
-                                {isSelected ? 'Referral Selected' : 'Select for Referral'}
+                                {isSelected ? t('referral_selected') : t('select_for_referral')}
                               </button>
                             </div>
                           </div>
@@ -887,19 +889,19 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                 <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <span className="text-xs font-extrabold tracking-wider uppercase text-slate-500 flex items-center gap-1.5">
                     <Volume2 className="w-3.5 h-3.5" />
-                    Transcripts & Translation
+                    {t('spoken_transcript')} & {t('english_translation')}
                   </span>
                   <span className="text-xs bg-[#0A2540] text-white px-2 py-0.5 rounded font-medium">
-                    Language: {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name.split(' · ')[0]}
+                    {t('language_label_summary')}: {INDIAN_LANGUAGES.find(l => l.code === selectedLanguage)?.name.split(' · ')[0]}
                   </span>
                 </div>
                 <div className="p-4 space-y-4">
                   <div>
-                    <h5 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-1">Spoken Voice (Original)</h5>
+                    <h5 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-1">{t('spoken_transcript')} ({t('original')})</h5>
                     <p className="text-slate-800 font-medium italic text-base leading-relaxed">"{transcript}"</p>
                   </div>
                   <div className="border-t border-slate-100 pt-4">
-                    <h5 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-1">English Translation (AI)</h5>
+                    <h5 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-1">{t('english_translation')} (AI)</h5>
                     <p className="text-slate-800 font-medium text-base leading-relaxed">"{translation}"</p>
                   </div>
                 </div>
@@ -908,8 +910,8 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               {/* WhatsApp Referral Action Button */}
               <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-left">
-                  <h4 className="font-bold text-[#0A2540] text-sm">Need to alert health staff?</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Send a prefilled referral slip instantly to ANM/PHC via WhatsApp.</p>
+                  <h4 className="font-bold text-[#0A2540] text-sm">{t('alert_health_staff')}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">{t('alert_health_staff_desc')}</p>
                 </div>
                 <a 
                   href={`https://api.whatsapp.com/send?text=${getWhatsAppText()}`}
@@ -920,7 +922,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
                     <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.403.002 9.803-4.394 9.807-9.804.002-2.62-1.01-5.086-2.853-6.93C16.38 1.986 13.916.965 11.299.965c-5.405 0-9.807 4.398-9.81 9.808-.002 1.902.502 3.754 1.457 5.36L1.848 22.24l6.32-1.656z" />
                   </svg>
-                  Share Referral Slip
+                  {t('share_referral')}
                 </a>
               </div>
 
@@ -929,7 +931,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                 <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
                   <h4 className="text-xs font-extrabold text-indigo-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    Extracted Key Words ({keywords.length})
+                    {t('extracted_keywords')} ({keywords.length})
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {keywords.map((kw, idx) => (
@@ -946,7 +948,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
               {/* Detected Symptoms */}
               <div>
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">Extracted Symptoms ({symptoms.length})</h4>
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3">{t('extracted_symptoms')} ({symptoms.length})</h4>
                 <div className="flex flex-wrap gap-2">
                   {symptoms.map((symptom, idx) => (
                     <span 
@@ -971,9 +973,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           {triageStep === 'anchoring' && (
             <div className="text-center py-16 flex flex-col items-center justify-center">
               <div className="w-16 h-16 border-4 border-[#0A2540]/10 border-t-[#E07A5F] rounded-full animate-spin mb-6"></div>
-              <h4 className="font-heading font-extrabold text-[#0A2540] text-xl">Anchoring on Polygon Blockchain</h4>
+              <h4 className="font-heading font-extrabold text-[#0A2540] text-xl">{t('anchoring_polygon')}</h4>
               <p className="text-slate-500 mt-2 max-w-sm text-sm">
-                Generating hash and registering block transaction...
+                {t('anchoring_polygon_desc')}
               </p>
               {anchoringLogs && (
                 <div className="mt-6 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-500 max-w-md animate-pulse">
@@ -991,7 +993,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
             disabled={triageStep === 'anchoring'}
             className="px-5 py-3 text-slate-600 hover:text-slate-800 font-bold text-sm transition-colors rounded-xl hover:bg-slate-100 disabled:opacity-30"
           >
-            Cancel
+            {t('cancel')}
           </button>
           {triageStep === 'completed' ? (
             <button 
@@ -999,7 +1001,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
               className="px-6 py-3 bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
-              Save & Anchor on Polygon
+              {t('save_anchor')}
             </button>
           ) : (
             triageStep === 'idle' && (
@@ -1008,7 +1010,7 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
                 className="px-6 py-3 bg-[#0A2540] hover:bg-[#123152] text-white font-bold text-sm rounded-xl transition-all shadow-md flex items-center gap-2"
               >
                 <Mic className="w-4 h-4" />
-                Record Now
+                {t('record_now')}
               </button>
             )
           )}

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function AddPatient({
   handleAddPatient
 }) {
+  const { t } = useLanguage();
   const [newPatient, setNewPatient] = useState({
     name: '',
     age: '',
@@ -30,25 +32,25 @@ export default function AddPatient({
 
   return (
     <div className="max-w-xl mx-auto fade-in-view space-y-6">
-      <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">Add new patient</h1>
+      <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">{t('add_new_patient')}</h1>
       
       <form onSubmit={(e) => handleSubmit(e, false)} className="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
         {/* Full Name */}
         <div>
-          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Full Name</label>
+          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('full_name')}</label>
           <input 
             type="text"
             required
             value={newPatient.name}
             onChange={(e) => setNewPatient(prev => ({ ...prev, name: e.target.value }))}
             className="w-full min-h-[50px] px-4 rounded-xl border border-slate-200 focus:border-[#E07A5F] focus:outline-none text-slate-700 font-medium"
-            placeholder="e.g. Ramesh Kumar"
+            placeholder={t('full_name_placeholder')}
           />
         </div>
 
         {/* Age */}
         <div>
-          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Age</label>
+          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('age')}</label>
           <input 
             type="number"
             required
@@ -57,13 +59,13 @@ export default function AddPatient({
             value={newPatient.age}
             onChange={(e) => setNewPatient(prev => ({ ...prev, age: e.target.value }))}
             className="w-full min-h-[50px] px-4 rounded-xl border border-slate-200 focus:border-[#E07A5F] focus:outline-none text-slate-700 font-medium"
-            placeholder="e.g. 35"
+            placeholder={t('age_placeholder')}
           />
         </div>
 
         {/* Gender Radio buttons */}
         <div>
-          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2.5">Gender</label>
+          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2.5">{t('gender')}</label>
           <div className="grid grid-cols-3 gap-2">
             {['Female', 'Male', 'Other'].map((genderOption) => (
               <button
@@ -76,7 +78,7 @@ export default function AddPatient({
                     : 'border-slate-100 hover:border-slate-200 text-slate-500'
                 }`}
               >
-                {genderOption}
+                {genderOption === 'Female' ? t('female') : genderOption === 'Male' ? t('male') : t('other')}
               </button>
             ))}
           </div>
@@ -85,36 +87,36 @@ export default function AddPatient({
         {/* Village and Phone side-by-side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Village</label>
+            <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('village')}</label>
             <input 
               type="text"
               value={newPatient.village}
               onChange={(e) => setNewPatient(prev => ({ ...prev, village: e.target.value }))}
               className="w-full min-h-[50px] px-4 rounded-xl border border-slate-200 focus:border-[#E07A5F] focus:outline-none text-slate-700 font-medium"
-              placeholder="e.g. Rampur"
+              placeholder={t('village_placeholder')}
             />
           </div>
           <div>
-            <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Phone (Optional)</label>
+            <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('phone_optional')}</label>
             <input 
               type="tel"
               value={newPatient.phone}
               onChange={(e) => setNewPatient(prev => ({ ...prev, phone: e.target.value }))}
               className="w-full min-h-[50px] px-4 rounded-xl border border-slate-200 focus:border-[#E07A5F] focus:outline-none text-slate-700 font-medium"
-              placeholder="e.g. 9876543210"
+              placeholder={t('phone_placeholder')}
             />
           </div>
         </div>
 
         {/* Notes (Optional) */}
         <div>
-          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Notes (Optional)</label>
+          <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('notes_optional')}</label>
           <textarea 
             rows="3"
             value={newPatient.notes}
             onChange={(e) => setNewPatient(prev => ({ ...prev, notes: e.target.value }))}
             className="w-full p-4 rounded-xl border border-slate-200 focus:border-[#E07A5F] focus:outline-none text-slate-700 font-medium resize-none"
-            placeholder="Any background info: pregnancy, chronic conditions, etc."
+            placeholder={t('notes_placeholder')}
           ></textarea>
         </div>
 
@@ -124,14 +126,14 @@ export default function AddPatient({
             type="submit"
             className="flex-grow min-h-[50px] px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm"
           >
-            Save Patient Info
+            {t('save_patient_info')}
           </button>
           <button 
             type="button"
             onClick={(e) => handleSubmit(e, true)}
             className="flex-grow min-h-[50px] px-5 bg-[#E07A5F] hover:bg-[#D46A4F] text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-soft transition-all text-sm hover:-translate-y-0.5 active:translate-y-0"
           >
-            Save & start triage
+            {t('save_start_triage')}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

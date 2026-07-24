@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { MapPin, Phone, ExternalLink, RefreshCw, ArrowLeft, Loader2, Stethoscope, Building2, Cross } from 'lucide-react';
 import { getNearbyHospitalsAsync } from '../utils/hospitals';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [hospitals, setHospitals] = useState([]);
   const [mapError, setMapError] = useState(null);
@@ -270,11 +272,11 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="font-heading font-extrabold text-lg tracking-tight">Locate Nearby Healthcare</h2>
+          <h2 className="font-heading font-extrabold text-lg tracking-tight">{t('locate_healthcare_title')}</h2>
         </div>
         <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-semibold">
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-          <span>Area: {userLocationName || 'Active GPS Center'}</span>
+          <span>{t('area')}: {userLocationName || t('active_gps_center')}</span>
         </div>
       </div>
 
@@ -283,14 +285,14 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
         {loading ? (
           <div className="absolute inset-0 z-50 bg-white flex flex-col justify-center items-center gap-4">
             <Loader2 className="w-8 h-8 text-[#E07A5F] animate-spin" />
-            <span className="text-slate-600 font-bold text-sm">Searching nearby clinics, PHCs & hospitals...</span>
+            <span className="text-slate-600 font-bold text-sm">{t('searching_facilities')}</span>
           </div>
         ) : null}
 
         {mapError ? (
           <div className="absolute inset-0 z-50 bg-white flex flex-col justify-center items-center p-6 text-center">
             <MapPin className="w-12 h-12 text-red-500 mb-4" />
-            <h3 className="font-bold text-lg text-slate-800">Map Loading Error</h3>
+            <h3 className="font-bold text-lg text-slate-800">{t('map_error_title')}</h3>
             <p className="text-sm text-slate-500 max-w-sm mt-1">{mapError}</p>
           </div>
         ) : null}
@@ -301,12 +303,12 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           {/* Header & Refresh */}
           <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              Facilities Found ({filteredHospitals.length})
+              {t('facilities_found')} ({filteredHospitals.length})
             </span>
             <button 
               onClick={loadFacilities}
               className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors"
-              title="Refresh Listings"
+              title={t('refresh_listings')}
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -322,7 +324,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                   : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
               }`}
             >
-              All ({hospitals.length})
+              {t('all')} ({hospitals.length})
             </button>
             <button
               onClick={() => setActiveFilter('clinic')}
@@ -333,7 +335,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              Clinics & PHC
+              {t('clinics_phc')}
             </button>
             <button
               onClick={() => setActiveFilter('hospital')}
@@ -344,7 +346,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              Hospitals
+              {t('hospitals')}
             </button>
             <button
               onClick={() => setActiveFilter('doctors')}
@@ -355,7 +357,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              Doctors
+              {t('doctors')}
             </button>
           </div>
 
@@ -363,7 +365,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           <div className="p-4 overflow-y-auto space-y-3 flex-grow">
             {filteredHospitals.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-sm">
-                No facilities found under this category within 25km radius.
+                {t('no_facilities_found')}
               </div>
             ) : (
               filteredHospitals.map(hosp => {
@@ -390,7 +392,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                             ? 'bg-amber-100 text-amber-800' 
                             : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {isClinic ? '🟢 Clinic / PHC' : isDoctor ? '🟡 Doctor Clinic' : '🔴 Hospital'}
+                          {isClinic ? `🟢 ${t('clinic_phc')}` : isDoctor ? `🟡 ${t('doctor_clinic')}` : `🔴 ${t('hospital')}`}
                         </span>
                         <h4 className="font-extrabold text-[#0A2540] text-sm leading-snug">{hosp.name}</h4>
                       </div>
@@ -409,7 +411,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                         className="flex-grow py-2 rounded-xl bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Phone className="w-3.5 h-3.5" />
-                        <span>Call</span>
+                        <span>{t('call')}</span>
                       </a>
                       <a 
                         href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
@@ -419,7 +421,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
                         className="flex-grow py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Directions</span>
+                        <span>{t('directions')}</span>
                       </a>
                     </div>
                   </div>

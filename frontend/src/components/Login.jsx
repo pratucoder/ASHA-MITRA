@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Activity, Phone, Lock, ArrowRight, Globe, ChevronDown, MapPin, Check, User } from 'lucide-react';
 import { reverseGeocode } from '../utils/hospitals';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function Login({
   phone,
@@ -10,10 +11,10 @@ export default function Login({
   loading,
   error,
   handleLogin,
-  selectedLanguage,
-  setSelectedLanguage,
   handleRegister
 }) {
+  const { language, setLanguage, t } = useLanguage();
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
@@ -93,28 +94,28 @@ export default function Login({
               <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#E07A5F] rounded-full"></span>
             </div>
             <div className="leading-tight">
-              <div className="font-heading font-extrabold text-2xl text-white">ASHA Saathi</div>
-              <div className="text-[10px] tracking-[0.18em] uppercase text-[#E07A5F] font-bold">AI Triage Companion</div>
+              <div className="font-heading font-extrabold text-2xl text-white">{t('app_title')}</div>
+              <div className="text-[10px] tracking-[0.18em] uppercase text-[#E07A5F] font-bold">{t('subtitle')}</div>
             </div>
           </div>
         </div>
         
         <div className="relative max-w-md my-12 lg:my-0">
-          <div className="text-xs tracking-[0.25em] uppercase text-[#E07A5F] font-bold mb-4">For India's Frontline</div>
+          <div className="text-xs tracking-[0.25em] uppercase text-[#E07A5F] font-bold mb-4">{t('for_india_frontline')}</div>
           <h2 className="font-heading text-4xl lg:text-5xl font-extrabold leading-tight">
-            Speak. Triage. <span className="text-[#E07A5F]">Save lives.</span>
+            {t('speak_triage_save')}
           </h2>
           <p className="mt-6 text-white/70 text-lg leading-relaxed">
-            AI-powered voice triage in 12 Indian languages — built for ASHA workers in rural India. Works offline, syncs when online.
+            {t('hero_desc')}
           </p>
           <div className="mt-8 flex items-center gap-3 text-sm text-white/60">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-            <span>Real-Time Production Server Online</span>
+            <span>{t('production_server_online')}</span>
           </div>
         </div>
         
         <div className="relative text-xs text-white/40 tracking-wider">
-          © ASHA Saathi · Anchored on Polygon
+          {t('copyright')}
         </div>
       </div>
       
@@ -125,15 +126,13 @@ export default function Login({
             <div className="relative">
               <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <select 
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
                 className="appearance-none pl-9 pr-8 py-2 text-sm rounded-xl border border-slate-200 bg-white font-medium text-[#0A2540] focus:outline-none focus:border-[#E07A5F] cursor-pointer hover:bg-slate-50 transition-colors"
               >
                 <option value="en">English · English</option>
                 <option value="hi">हिन्दी · Hindi</option>
                 <option value="mr">मराठी · Marathi</option>
-                <option value="ta">தமிழ் · Tamil</option>
-                <option value="te">తెలుగు · Telugu</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -143,9 +142,9 @@ export default function Login({
             /* SIGN IN VIEW */
             <>
               <div className="mb-8">
-                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">Welcome</div>
-                <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">Sign in to your account</h1>
-                <p className="text-slate-600 mt-2 text-sm">Enter your registered phone number and password.</p>
+                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">{t('welcome')}</div>
+                <h1 className="font-heading text-3xl font-extrabold text-[#0A2540]">{t('sign_in')}</h1>
+                <p className="text-slate-600 mt-2 text-sm">{t('sign_in_desc')}</p>
               </div>
 
               {error && (
@@ -156,7 +155,7 @@ export default function Login({
               
               <form className="space-y-5" onSubmit={handleLogin}>
                 <div>
-                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Phone number</label>
+                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('phone_number')}</label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     <input 
@@ -172,7 +171,7 @@ export default function Login({
                 </div>
                 
                 <div>
-                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">Password</label>
+                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-2">{t('password')}</label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     <input 
@@ -196,7 +195,7 @@ export default function Login({
                     <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Sign in
+                      {t('sign_in_btn')}
                       <ArrowRight className="w-5 h-5" />
                     </>
                   )}
@@ -204,12 +203,12 @@ export default function Login({
               </form>
               
               <div className="mt-8 pt-6 border-t border-slate-100 text-sm text-slate-600 text-center">
-                Don't have an account?{' '}
+                {t('register_link').split('?')[0]}?{' '}
                 <button 
                   onClick={() => setIsRegistering(true)} 
                   className="text-[#E07A5F] font-bold hover:underline bg-transparent border-none cursor-pointer"
                 >
-                  Register New Account
+                  {t('register_title')}
                 </button>
               </div>
             </>
@@ -217,9 +216,9 @@ export default function Login({
             /* REGISTER VIEW */
             <>
               <div className="mb-6">
-                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">Create an account</div>
+                <div className="text-xs tracking-[0.2em] uppercase text-[#E07A5F] font-bold mb-2">{t('register_title')}</div>
                 <h1 className="font-heading text-2xl font-extrabold text-[#0A2540]">ASHA / ANM Registration</h1>
-                <p className="text-slate-600 mt-1 text-sm">Register your details to create your secure workspace.</p>
+                <p className="text-slate-600 mt-1 text-sm">{t('register_desc')}</p>
               </div>
 
               {regError && (
@@ -230,7 +229,7 @@ export default function Login({
 
               <form className="space-y-4" onSubmit={handleRegSubmit}>
                 <div>
-                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">Full Name</label>
+                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">{t('full_name')}</label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <input 
@@ -239,13 +238,13 @@ export default function Login({
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="Enter full name" 
+                      placeholder={t('full_name_placeholder')}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">Phone number</label>
+                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">{t('phone_number')}</label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <input 
@@ -254,13 +253,13 @@ export default function Login({
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="10-digit mobile number" 
+                      placeholder="e.g. 9876543210"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">Password</label>
+                  <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">{t('password')}</label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <input 
@@ -269,32 +268,32 @@ export default function Login({
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="w-full min-h-[48px] pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="Create a password" 
+                      placeholder="••••••••"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">Role</label>
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">{t('select_role')}</label>
                     <select
                       value={regRole}
                       onChange={(e) => setRegRole(e.target.value)}
                       className="w-full min-h-[48px] px-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-[#0A2540] focus:border-[#E07A5F] focus:outline-none cursor-pointer"
                     >
-                      <option value="ASHA Worker">ASHA Worker</option>
-                      <option value="ANM Supervisor">ANM Supervisor</option>
+                      <option value="ASHA Worker">{t('asha_label')}</option>
+                      <option value="ANM Supervisor">{t('supervisor_workspace_title')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">Assigned Village</label>
+                    <label className="text-xs font-bold tracking-wider uppercase text-slate-500 block mb-1">{t('village')}</label>
                     <input 
                       type="text"
                       required
                       value={regLocation}
                       onChange={(e) => setRegLocation(e.target.value)}
                       className="w-full min-h-[48px] px-3 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#E07A5F] focus:outline-none transition-colors placeholder:text-slate-300 font-medium text-[#0A2540]" 
-                      placeholder="Village / Town" 
+                      placeholder={t('village_placeholder')}
                     />
                   </div>
                 </div>
@@ -320,7 +319,7 @@ export default function Login({
                       ) : (
                         <MapPin className="w-4 h-4 text-[#E07A5F]" />
                       )}
-                      {gpsLoading ? 'Fetching Coordinates...' : regCoords ? 'GPS Location Locked' : 'Fetch GPS Home Location'}
+                      {gpsLoading ? t('gps_fetching') : regCoords ? t('gps_success') : t('fetch_gps')}
                     </button>
                   </div>
                   {regCoords && (
@@ -339,7 +338,7 @@ export default function Login({
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Create Account & Sign In
+                      {t('register_btn')}
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -352,7 +351,7 @@ export default function Login({
                   onClick={() => setIsRegistering(false)} 
                   className="text-[#E07A5F] font-semibold hover:underline bg-transparent border-none cursor-pointer"
                 >
-                  Sign in to your account
+                  {t('back_to_login')}
                 </button>
               </div>
             </>

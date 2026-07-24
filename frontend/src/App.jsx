@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Activity, Home, Users, History as HistoryIcon, LogOut, ChevronRight, X, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, ExternalLink, Phone, MapPin
+  Activity, Home, Users, History as HistoryIcon, LogOut, ChevronRight, X, AlertCircle, CheckCircle2, AlertTriangle, Sparkles, ExternalLink, Phone, MapPin, Globe, ChevronDown
 } from 'lucide-react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -11,8 +11,10 @@ import ANMDashboard from './components/ANMDashboard';
 import VoiceTriageModal from './components/VoiceTriageModal';
 import HospitalsMap from './components/HospitalsMap';
 import { getNearbyHospitals, registerDynamicVillage, reverseGeocode } from './utils/hospitals';
+import { useLanguage } from './context/LanguageContext';
 import './App.css';
 import { API_BASE_URL } from './config';
+
 
 // Seed initial history data for ANM Supervisor cluster view
 const SEED_TRIAGES = [
@@ -57,6 +59,10 @@ const SEED_TRIAGES = [
 ];
 
 function App() {
+  const { language, setLanguage, t } = useLanguage();
+  const selectedLanguage = language;
+  const setSelectedLanguage = setLanguage;
+
   // Authentication & User state
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -79,7 +85,6 @@ function App() {
 
   // Global UI State
   const [currentView, setCurrentView] = useState('home'); // home, patients, add-patient, history
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [toast, setToast] = useState(null);
 
   // Data State with LocalStorage persistence
@@ -449,9 +454,24 @@ function App() {
               <Activity className="w-5 h-5 text-[#E07A5F]" />
             </div>
             <div>
-              <div className="font-heading font-black text-lg text-white">ASHA Saathi</div>
-              <div className="text-[8px] tracking-[0.15em] uppercase text-[#E07A5F] font-bold">AI Triage Companion</div>
+              <div className="font-heading font-black text-lg text-white">{t('app_title')}</div>
+              <div className="text-[8px] tracking-[0.15em] uppercase text-[#E07A5F] font-bold">{t('subtitle')}</div>
             </div>
+          </div>
+
+          {/* Language Selector */}
+          <div className="relative">
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select 
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="appearance-none w-full pl-9 pr-8 py-2 text-sm rounded-xl border border-white/10 bg-white/5 font-semibold text-white focus:outline-none focus:border-[#E07A5F] cursor-pointer hover:bg-white/10 transition-colors"
+            >
+              <option value="en" className="bg-[#0A2540] text-white">English · English</option>
+              <option value="hi" className="bg-[#0A2540] text-white">हिन्दी · Hindi</option>
+              <option value="mr" className="bg-[#0A2540] text-white">मराठी · Marathi</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Navigation Links */}
@@ -468,7 +488,7 @@ function App() {
                 >
                   <span className="flex items-center gap-3">
                     <Home className="w-5 h-5" />
-                    Home
+                    {t('home')}
                   </span>
                   {currentView === 'home' && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
                 </button>
@@ -483,7 +503,7 @@ function App() {
                 >
                   <span className="flex items-center gap-3">
                     <Users className="w-5 h-5" />
-                    Patients
+                    {t('patients')}
                   </span>
                   {(currentView === 'patients' || currentView === 'add-patient') && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
                 </button>
@@ -498,7 +518,7 @@ function App() {
                 >
                   <span className="flex items-center gap-3">
                     <HistoryIcon className="w-5 h-5" />
-                    History
+                    {t('history')}
                   </span>
                   {currentView === 'history' && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
                 </button>
@@ -513,7 +533,7 @@ function App() {
                 >
                   <span className="flex items-center gap-3">
                     <MapPin className="w-5 h-5 text-[#E07A5F]" />
-                    Locate Hospitals
+                    {t('locate_hospitals')}
                   </span>
                   {currentView === 'map' && <ChevronRight className="w-4 h-4 text-[#E07A5F]" />}
                 </button>
@@ -526,7 +546,7 @@ function App() {
               >
                 <span className="flex items-center gap-3">
                   <Home className="w-5 h-5" />
-                  Cluster Dashboard
+                  {t('cluster_dashboard')}
                 </span>
                 <ChevronRight className="w-4 h-4 text-[#E07A5F]" />
               </button>
@@ -538,14 +558,14 @@ function App() {
         <div className="space-y-3 pt-4 border-t border-white/10 shrink-0">
           <div>
             <div className="font-bold text-sm text-white">{user.name}</div>
-            <div className="text-[10px] uppercase text-[#E07A5F] font-extrabold tracking-wider">{user.role} · {user.location}</div>
+            <div className="text-[10px] uppercase text-[#E07A5F] font-extrabold tracking-wider">{user.role === 'ASHA Worker' || user.role === 'ASHA' ? t('asha_label') : t('supervisor_workspace_title')} · {user.location}</div>
           </div>
           <button 
             onClick={handleLogout}
             className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-2 text-xs font-bold text-white/80 hover:text-white transition-colors"
           >
             <LogOut className="w-4 h-4 text-[#E07A5F]" />
-            Logout
+            {t('logout')}
           </button>
         </div>
       </aside>
@@ -554,11 +574,25 @@ function App() {
       <header className="md:hidden bg-[#0A2540] text-white px-5 py-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-[#E07A5F]" />
-          <span className="font-heading font-extrabold text-md">ASHA Saathi</span>
+          <span className="font-heading font-extrabold text-md">{t('app_title')}</span>
         </div>
-        <div className="text-right flex flex-col items-end">
-          <span className="text-xs font-bold text-slate-300 block">{user.name}</span>
-          <span className="text-[9px] uppercase text-[#E07A5F] font-black">{user.location}</span>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <select 
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="appearance-none pl-8 pr-6 py-1.5 text-xs rounded-lg border border-white/10 bg-white/5 font-semibold text-white focus:outline-none cursor-pointer"
+            >
+              <option value="en" className="bg-[#0A2540] text-white">EN</option>
+              <option value="hi" className="bg-[#0A2540] text-white">हिन्दी</option>
+              <option value="mr" className="bg-[#0A2540] text-white">मराठी</option>
+            </select>
+          </div>
+          <div className="text-right flex flex-col items-end">
+            <span className="text-xs font-bold text-slate-300 block">{user.name}</span>
+            <span className="text-[9px] uppercase text-[#E07A5F] font-black">{user.location}</span>
+          </div>
         </div>
       </header>
 
@@ -567,7 +601,9 @@ function App() {
         
         {/* Breadcrumb Workspace Segment */}
         <div className="mb-2">
-          <span className="text-[10px] font-black tracking-[0.25em] uppercase text-[#E07A5F]">ASHA WORKSPACE</span>
+          <span className="text-[10px] font-black tracking-[0.25em] uppercase text-[#E07A5F]">
+            {isASHA ? t('workspace') : t('supervisor_workspace')}
+          </span>
         </div>
 
         {isASHA ? (
@@ -640,7 +676,7 @@ function App() {
             }`}
           >
             <Home className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Home</span>
+            <span className="text-[10px] font-bold mt-1">{t('home')}</span>
           </button>
 
           <button 
@@ -650,7 +686,7 @@ function App() {
             }`}
           >
             <Users className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Patients</span>
+            <span className="text-[10px] font-bold mt-1">{t('patients')}</span>
           </button>
 
           <button 
@@ -660,7 +696,7 @@ function App() {
             }`}
           >
             <HistoryIcon className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">History</span>
+            <span className="text-[10px] font-bold mt-1">{t('history')}</span>
           </button>
 
           <button 
@@ -670,7 +706,7 @@ function App() {
             }`}
           >
             <MapPin className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Map</span>
+            <span className="text-[10px] font-bold mt-1">{t('locate_hospitals').split(' ')[0]}</span>
           </button>
 
           <button 
@@ -678,7 +714,7 @@ function App() {
             className="flex flex-col items-center justify-center p-1.5 text-slate-400 hover:text-white transition-colors"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Logout</span>
+            <span className="text-[10px] font-bold mt-1">{t('logout')}</span>
           </button>
         </footer>
       )}
@@ -691,7 +727,7 @@ function App() {
             className="flex flex-col items-center justify-center p-1.5 text-[#E07A5F]"
           >
             <Home className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Dashboard</span>
+            <span className="text-[10px] font-bold mt-1">{t('cluster_dashboard').split(' ')[0]}</span>
           </button>
           
           <button 
@@ -699,7 +735,7 @@ function App() {
             className="flex flex-col items-center justify-center p-1.5 text-slate-400 hover:text-white transition-colors"
           >
             <LogOut className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-1">Logout</span>
+            <span className="text-[10px] font-bold mt-1">{t('logout')}</span>
           </button>
         </footer>
       )}
@@ -723,9 +759,9 @@ function App() {
             <div className="px-6 py-4 bg-[#0A2540] text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="font-heading font-extrabold text-lg">
-                  {selectedHistoryItem.showExplorer ? 'Polygonscan Verification Explorer' : 'Triage Details'}
+                  {selectedHistoryItem.showExplorer ? t('polygon_explorer') : t('triage_summary')}
                 </h3>
-                <p className="text-xs text-white/70">Patient: <span className="font-semibold">{selectedHistoryItem.patientName}</span></p>
+                <p className="text-xs text-white/70">{t('patient')}: <span className="font-semibold">{selectedHistoryItem.patientName}</span></p>
               </div>
               <button 
                 onClick={() => setSelectedHistoryItem(null)} 
@@ -745,19 +781,19 @@ function App() {
                       Polygon Amoy Network
                     </span>
                     <span className="px-2 py-0.5 bg-green-100 text-green-800 text-[10px] font-black uppercase rounded">
-                      Secured
+                      {t('secured')}
                     </span>
                   </div>
 
                   <div className="space-y-3 font-mono text-xs text-slate-600">
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">Transaction Hash</span>
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">{t('tx_hash')}</span>
                       <span className="break-all text-slate-800 font-semibold select-all">{selectedHistoryItem.txHash}</span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">Block Confirmation</span>
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">{t('block')}</span>
                         <span className="text-slate-800 font-bold">#{selectedHistoryItem.blockNumber}</span>
                       </div>
                       <div>
@@ -767,7 +803,7 @@ function App() {
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">SHA-256 Data Root Hash</span>
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase font-sans">{t('data_hash')}</span>
                       <span className="break-all text-slate-800 font-semibold select-all">{selectedHistoryItem.dataHash}</span>
                     </div>
 
@@ -811,7 +847,7 @@ function App() {
                     
                      <div>
                       <h4 className="font-bold text-sm">
-                        {selectedHistoryItem.urgency} Urgency Classification
+                        {(selectedHistoryItem.urgency === 'Red' ? t('red') : selectedHistoryItem.urgency === 'Yellow' ? t('yellow') : t('green'))} {t('ai_urgency_level')}
                       </h4>
                       <p className="text-xs mt-0.5 opacity-90">{selectedHistoryItem.advice}</p>
                     </div>
@@ -822,9 +858,9 @@ function App() {
                     <div className="bg-[#FFF5F5] border border-red-200/80 rounded-2xl p-4 space-y-3">
                       <div className="flex items-center gap-2 border-b border-red-100 pb-2">
                         <MapPin className="w-4 h-4 text-red-600 animate-bounce" />
-                        <h5 className="font-bold text-[#0A2540] text-xs uppercase tracking-wider">Nearby Emergency Services</h5>
+                        <h5 className="font-bold text-[#0A2540] text-xs uppercase tracking-wider">{t('nearby_emergency')}</h5>
                         <span className="text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold ml-auto">
-                          Village: {selectedHistoryItem.village}
+                          {t('village_label')}: {selectedHistoryItem.village}
                         </span>
                       </div>
                       <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
@@ -849,7 +885,7 @@ function App() {
                                 className="p-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 flex items-center justify-center gap-1 font-bold text-[10px]"
                               >
                                 <Phone className="w-3 h-3" />
-                                <span>Call</span>
+                                <span>{t('call')}</span>
                               </a>
                               <a 
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hosp.name + ' ' + hosp.address)}`}
@@ -873,7 +909,7 @@ function App() {
                       <div className="text-xs">
                         <span className="font-bold text-blue-900 flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5 text-[#E07A5F]" />
-                          On-Chain Anchored Triage
+                          {t('secured_polygon')}
                         </span>
                         <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">Tx: {selectedHistoryItem.txHash.substring(0, 16)}...</span>
                       </div>
@@ -881,7 +917,7 @@ function App() {
                         onClick={() => setSelectedHistoryItem(prev => ({ ...prev, showExplorer: true }))}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center gap-1 transition-colors shadow-sm"
                       >
-                        Verify Receipts
+                        {t('verify_on_chain')}
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -890,19 +926,19 @@ function App() {
                   {/* Patient Profile Snapshot */}
                   <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div>
-                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">Patient</span>
+                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">{t('patient')}</span>
                       <span className="font-semibold text-slate-800">{selectedHistoryItem.patientName} ({selectedHistoryItem.patientDetails})</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">Village Location</span>
+                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">{t('village_label')}</span>
                       <span className="font-semibold text-slate-800">{selectedHistoryItem.village}</span>
                     </div>
                     <div className="mt-2">
-                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">Language</span>
+                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">{t('language_spoken_col')}</span>
                       <span className="font-semibold text-slate-800">{selectedHistoryItem.language}</span>
                     </div>
                     <div className="mt-2">
-                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">Triage Date</span>
+                      <span className="text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">{t('date_time_col')}</span>
                       <span className="font-semibold text-slate-800">{selectedHistoryItem.date}</span>
                     </div>
                   </div>
@@ -910,18 +946,18 @@ function App() {
                   {/* Transcripts */}
                   <div className="space-y-3">
                     <div className="border-l-2 border-slate-200 pl-3">
-                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Spoken Audio Transcript</h5>
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('spoken_transcript')}</h5>
                       <p className="text-sm font-medium text-slate-700 italic mt-0.5">"{selectedHistoryItem.transcript}"</p>
                     </div>
                     <div className="border-l-2 border-[#E07A5F] pl-3">
-                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">English Clinical Translation</h5>
+                      <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{t('english_translation')}</h5>
                       <p className="text-sm font-medium text-slate-700 mt-0.5">"{selectedHistoryItem.translation}"</p>
                     </div>
                   </div>
 
                   {/* Extracted Symptoms */}
                   <div>
-                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Detected Symptoms</h5>
+                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">{t('extracted_symptoms')}</h5>
                     <div className="flex flex-wrap gap-1.5">
                       {selectedHistoryItem.symptoms && selectedHistoryItem.symptoms.map((s, i) => (
                         <span key={i} className="text-xs px-2.5 py-1 bg-slate-100 text-[#0A2540] font-semibold rounded-md border border-slate-200">
