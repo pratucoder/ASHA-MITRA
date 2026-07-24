@@ -355,43 +355,45 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
 
   const processSarvamSTT = async (audioBlob) => {
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = async () => {
-        const base64Audio = reader.result;
-        recordedBase64Ref.current = base64Audio;
+      const base64Audio = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
 
-        const response = await fetch(`${API_BASE_URL}/api/speech-to-text`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audio: base64Audio,
-            languageCode: selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-IN'
-          })
-        });
+      recordedBase64Ref.current = base64Audio;
 
-        const data = await response.json();
+      const response = await fetch(`${API_BASE_URL}/api/speech-to-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: base64Audio,
+          languageCode: selectedLanguage === 'hi' ? 'hi-IN' : selectedLanguage === 'mr' ? 'mr-IN' : 'en-IN'
+        })
+      });
 
-        if (response.ok && data.transcript && data.transcript.trim()) {
+      const data = await response.json();
+
+      if (response.ok && data.transcript && data.transcript.trim()) {
+        setSpeechNotice('');
+        setSttProvider('Sarvam AI Speech-to-Text');
+        setTranscript(data.transcript);
+        transcriptRef.current = data.transcript;
+        finishTriageAnalysis(data.transcript);
+      } else {
+        // Fallback to Web Speech API text if captured from live microphone
+        const textToUse = (transcriptRef.current || transcript || '').trim();
+        if (textToUse) {
           setSpeechNotice('');
-          setSttProvider('Sarvam AI Speech-to-Text');
-          setTranscript(data.transcript);
-          transcriptRef.current = data.transcript;
-          finishTriageAnalysis(data.transcript);
+          setSttProvider('Web Speech API');
+          finishTriageAnalysis(textToUse);
         } else {
-          // Fallback to Web Speech API text if captured from live microphone
-          const textToUse = (transcriptRef.current || transcript || '').trim();
-          if (textToUse) {
-            setSpeechNotice('');
-            setSttProvider('Web Speech API');
-            finishTriageAnalysis(textToUse);
-          } else {
-            setTriageStep('idle');
-            const detail = data.error || "No speech detected";
-            setSpeechNotice(`⚠️ Sarvam STT: ${detail}. Please speak clearly into your mic and try again.`);
-          }
+          setTriageStep('idle');
+          const detail = data.error || "No speech detected";
+          setSpeechNotice(`⚠️ Sarvam STT: ${detail}. Please speak clearly into your mic and try again.`);
         }
-      };
+      }
     } catch (err) {
       console.warn("Sarvam STT backend request error:", err);
       const textToUse = (transcriptRef.current || transcript || '').trim();

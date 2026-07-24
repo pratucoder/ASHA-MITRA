@@ -544,7 +544,11 @@ if (fs.existsSync(frontendBuildPath)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
 

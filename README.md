@@ -485,31 +485,33 @@ npm run dev
 
 ---
 
-# Deployment on Render
+# Deployment on Vercel
 
-This project contains a `render.yaml` Blueprint file for automatic configuration on Render.
+Since the repository contains separate frontend and backend applications, you will deploy them as two separate projects on Vercel.
 
-## Option 1: Monolithic Deployment (Recommended)
+## 1. Backend Deployment
 
-In this mode, a single Render Web Service builds the React frontend and runs the Node.js express backend, serving the static frontend files directly. This avoids CORS issues and fits nicely into a single free tier service.
-
-1. Go to **Render Dashboard** -> **Blueprints** -> **New Blueprint Instance**.
+1. Go to your **Vercel Dashboard** and click **Add New** -> **Project**.
 2. Connect your GitHub repository.
-3. Render will parse `render.yaml` and offer to deploy the `asha-mitra-monolith` Web Service.
-4. Input the required environment variables:
-   - `MONGODB_URI`: Your MongoDB Atlas URI.
+3. In the project settings, set the **Root Directory** to `backend`.
+4. Vercel will automatically detect `backend/vercel.json` and deploy the Express API.
+5. Configure the following **Environment Variables** in the project settings:
+   - `MONGODB_URI`: Your persistent MongoDB Atlas URI.
    - `SARVAM_API_KEY`: Your Sarvam Speech API Key.
    - `OPENROUTER_API_KEY`: Your OpenRouter API Key.
-   - `JWT_SECRET`: Leave blank or customize (automatically generated).
-5. Click **Approve** to build and launch the application.
+   - `JWT_SECRET`: A secure random key for JWT signing.
+6. Click **Deploy** and copy your deployed backend URL (e.g. `https://asha-mitra-backend.vercel.app`).
 
-## Option 2: Split Services Deployment (Frontend Static + Backend Web Service)
+## 2. Frontend Deployment
 
-If you prefer to deploy frontend and backend separately, Render will also suggest `asha-mitra-backend` and `asha-mitra-frontend`.
-
-1. Deploy the backend service (`asha-mitra-backend`) first. Make note of its deployed URL (e.g. `https://asha-mitra-backend.onrender.com`).
-2. Deploy the frontend service (`asha-mitra-frontend`) and specify the environment variable `VITE_API_URL` as the backend URL from step 1.
-3. Configure the backend service env variable `FRONTEND_URL` to point to the frontend's static site URL to secure CORS referrers.
+1. Go to your **Vercel Dashboard** and click **Add New** -> **Project**.
+2. Connect the same GitHub repository.
+3. In the project settings:
+   - Set the **Root Directory** to `frontend`.
+   - Set the **Framework Preset** to `Vite`.
+4. Configure the following **Environment Variable** in the project settings:
+   - `VITE_API_URL`: Set this to your deployed backend URL from step 1 (including `https://`).
+5. Click **Deploy**. Vercel will read `frontend/vercel.json` to handle client-side routing properly.
 
 ---
 
