@@ -309,7 +309,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       try { speechRecognitionRef.current.stop(); } catch(e){}
     }
 
-    // Stop MediaRecorder and process audio with Sarvam AI STT API
+    const capturedText = (transcriptRef.current || transcript || '').trim();
+
+    // Stop MediaRecorder and process audio
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.onstop = async () => {
         // Stop audio stream tracks
@@ -317,15 +319,17 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
           mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
         }
 
-        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-
-        if (audioBlob.size > 0) {
-          await processSarvamSTT(audioBlob);
+        // If we already have the real-time transcript from Web Speech API, use it instantly!
+        if (capturedText) {
+          setSttProvider('Web Speech API (Real-time)');
+          finishTriageAnalysis(capturedText);
         } else {
-          const captured = (transcriptRef.current || transcript || '').trim();
-          if (captured) {
-            finishTriageAnalysis(captured);
+          // Fallback: process the recorded audio blob with Sarvam STT API
+          const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+          if (audioBlob.size > 0) {
+            await processSarvamSTT(audioBlob);
           } else {
             setTriageStep('idle');
             setSpeechNotice("⚠️ Microphone captured 0 bytes of audio. Please speak clearly into your mic.");
@@ -339,9 +343,9 @@ export default function VoiceTriageModal({ isOpen, onClose, patient, onSaveTriag
       }
     } else {
       // Fallback analysis if MediaRecorder didn't capture chunks
-      const captured = (transcriptRef.current || transcript || '').trim();
-      if (captured) {
-        finishTriageAnalysis(captured);
+      if (capturedText) {
+        setSttProvider('Web Speech API (Real-time)');
+        finishTriageAnalysis(capturedText);
       } else {
         setTriageStep('idle');
         setSpeechNotice("⚠️ Microphone capture failed to start. Please check microphone hardware permissions and try again.");
