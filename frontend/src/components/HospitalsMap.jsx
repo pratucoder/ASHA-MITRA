@@ -1,11 +1,15 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { MapPin, Phone, ExternalLink, RefreshCw, ArrowLeft, Loader2, Stethoscope, Building2, Cross } from 'lucide-react';
-import { getNearbyHospitalsAsync } from '../utils/hospitals';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { MapPin, Phone, ExternalLink, RefreshCw, ArrowLeft, Loader2 } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { getNearbyHospitalsAsync, getHaversineDistance } from '../utils/hospitals';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
+  
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [hospitals, setHospitals] = useState([]);
   const [mapError, setMapError] = useState(null);
   const [selectedHospital, setSelectedHospital] = useState(null);
@@ -14,7 +18,9 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const userMarkerRef = useRef(null);
   const hospitalMarkersRef = useRef({});
+  const lastFetchedCoordsRef = useRef(null);
 
   // Fallback coordinates (Katni region)
   const defaultLat = 23.8000;
@@ -23,124 +29,105 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
   const lat = userCoords ? userCoords.latitude : defaultLat;
   const lng = userCoords ? userCoords.longitude : defaultLng;
 
-  // Load Leaflet JS & CSS dynamically
-  useEffect(() => {
-    let active = true;
+  // 1. Fetch medical facilities (with distance thresholding & smooth background updates)
+  const fetchFacilities = useCallback(async (force = false) => {
+    const currentLat = userCoords?.latitude || defaultLat;
+    const currentLng = userCoords?.longitude || defaultLng;
 
-    const loadLeaflet = async () => {
-      if (!window.L) {
-        // Load CSS
-        if (!document.getElementById('leaflet-css')) {
-          const link = document.createElement('link');
-          link.id = 'leaflet-css';
-          link.rel = 'stylesheet';
-          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-          document.head.appendChild(link);
-        }
-
-        // Load JS
-        await new Promise((resolve, reject) => {
-          if (document.getElementById('leaflet-js')) {
-            resolve();
-            return;
-          }
-          const script = document.createElement('script');
-          script.id = 'leaflet-js';
-          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      if (active) {
-        setLoading(false);
-      }
-    };
-
-    loadLeaflet().catch(err => {
-      console.error('Leaflet loading error:', err);
-      if (active) setMapError('Failed to load Leaflet mapping engine.');
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Fetch medical facilities (hospitals, clinics, doctors)
-  const loadFacilities = () => {
-    setLoading(true);
-    getNearbyHospitalsAsync(userCoords?.latitude, userCoords?.longitude, userLocationName)
-      .then(res => {
-        setHospitals(res);
-        if (res.length > 0) {
-          setSelectedHospital(res[0]);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching facilities:', err);
-        setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    loadFacilities();
-  }, [userCoords, userLocationName]);
-
-  // Initialize Leaflet Map
-  useEffect(() => {
-    if (loading || !window.L || !mapContainerRef.current) return;
-
-    const L = window.L;
-
-    // Reset map instance if already initialized
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove();
-      mapInstanceRef.current = null;
+    // Skip refetching if shift is micro-drift (< 500 meters) unless forced
+    if (!force && lastFetchedCoordsRef.current) {
+      const shift = getHaversineDistance(
+        lastFetchedCoordsRef.current.lat,
+        lastFetchedCoordsRef.current.lng,
+        currentLat,
+        currentLng
+      );
+      if (shift < 0.5) return;
     }
 
-    // Create Leaflet Map Instance
-    const map = L.map(mapContainerRef.current, {
-      center: [lat, lng],
-      zoom: 13,
-      zoomControl: true
-    });
-    mapInstanceRef.current = map;
+    if (hospitals.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setIsFetching(true);
+    }
 
-    // Add OpenStreetMap Tile Layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map);
+    try {
+      const res = await getNearbyHospitalsAsync(userCoords?.latitude, userCoords?.longitude, userLocationName);
+      setHospitals(res);
+      lastFetchedCoordsRef.current = { lat: currentLat, lng: currentLng };
+      if (res.length > 0 && !selectedHospital) {
+        setSelectedHospital(res[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching facilities:', err);
+      setMapError('Failed to retrieve nearby healthcare facilities.');
+    } finally {
+      setInitialLoading(false);
+      setIsFetching(false);
+    }
+  }, [userCoords, userLocationName, hospitals.length, selectedHospital]);
 
-    // Create Markers Layer Group
-    const markersLayer = L.layerGroup().addTo(map);
-    markersLayerRef.current = markersLayer;
+  useEffect(() => {
+    fetchFacilities(false);
+  }, [fetchFacilities]);
 
-    // Custom Pulsing User Location Marker (Blue SVG)
-    const userMarkerIcon = L.divIcon({
-      html: `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
-          <circle cx="15" cy="15" r="12" fill="#3B82F6" fill-opacity="0.25">
-            <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
-          </circle>
-          <circle cx="15" cy="15" r="6" fill="#1D4ED8" stroke="#FFFFFF" stroke-width="2"/>
-        </svg>
-      `,
-      className: 'user-map-marker-wrapper',
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
-    });
+  // 2. Initialize Leaflet Map Instance ONCE when map container mounts
+  useEffect(() => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    const userMarker = L.marker([lat, lng], { icon: userMarkerIcon }).addTo(map);
-    userMarker.bindPopup(`
-      <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #0A2540; padding: 2px;">
-        <b style="color: #1D4ED8; font-size: 13px;">📍 Your Current Location</b><br/>
-        <span style="color: #64748B;">${userLocationName || 'Active GPS Center'}</span>
-      </div>
-    `);
+    try {
+      // Create Leaflet Map Instance
+      const map = L.map(mapContainerRef.current, {
+        center: [lat, lng],
+        zoom: 13,
+        zoomControl: true
+      });
+      mapInstanceRef.current = map;
+
+      // Add OpenStreetMap Tile Layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+
+      // Create Markers Layer Group
+      const markersLayer = L.layerGroup().addTo(map);
+      markersLayerRef.current = markersLayer;
+
+      // Custom Pulsing User Location Marker (Blue SVG)
+      const userMarkerIcon = L.divIcon({
+        html: `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" width="30" height="30">
+            <circle cx="15" cy="15" r="12" fill="#3B82F6" fill-opacity="0.25">
+              <animate attributeName="r" values="8;14;8" dur="2s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="15" cy="15" r="6" fill="#1D4ED8" stroke="#FFFFFF" stroke-width="2"/>
+          </svg>
+        `,
+        className: 'user-map-marker-wrapper',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
+
+      const userMarker = L.marker([lat, lng], { icon: userMarkerIcon }).addTo(map);
+      userMarker.bindPopup(`
+        <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #0A2540; padding: 2px;">
+          <b style="color: #1D4ED8; font-size: 13px;">📍 Your Current Location</b><br/>
+          <span style="color: #64748B;">${userLocationName || 'Active GPS Center'}</span>
+        </div>
+      `);
+      userMarkerRef.current = userMarker;
+
+      // Recalculate tile sizes after container layout is stabilized
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 150);
+    } catch (err) {
+      console.error('Leaflet initialization error:', err);
+      setMapError('Failed to initialize map display.');
+    }
 
     return () => {
       if (mapInstanceRef.current) {
@@ -148,7 +135,20 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
         mapInstanceRef.current = null;
       }
     };
-  }, [loading, lat, lng]);
+  }, []);
+
+  // 3. Update User Marker Position smoothly when userCoords update (Without destroying map)
+  useEffect(() => {
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([lat, lng]);
+      userMarkerRef.current.setPopupContent(`
+        <div style="font-family: system-ui, sans-serif; font-size: 13px; line-height: 1.4; color: #0A2540; padding: 2px;">
+          <b style="color: #1D4ED8; font-size: 13px;">📍 Your Current Location</b><br/>
+          <span style="color: #64748B;">${userLocationName || 'Active GPS Center'}</span>
+        </div>
+      `);
+    }
+  }, [lat, lng, userLocationName]);
 
   // Filter facilities based on active tab
   const filteredHospitals = hospitals.filter(h => {
@@ -159,27 +159,23 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
     return true;
   });
 
-  // Update Markers on Leaflet Map whenever list or filter changes
+  // 4. Update Facility Markers smoothly when filtered list changes
   useEffect(() => {
-    if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
+    if (!mapInstanceRef.current || !markersLayerRef.current) return;
 
-    const L = window.L;
     const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current;
+
     markersLayer.clearLayers();
     hospitalMarkersRef.current = {};
 
-    // Helper to get custom colored SVG pin based on facility type
     const getMarkerHtml = (type) => {
       let pinColor = '#EF4444'; // Red for hospital
-      let badgeLabel = '+';
 
       if (type === 'clinic') {
         pinColor = '#10B981'; // Green for clinic/PHC
-        badgeLabel = 'Clinic';
       } else if (type === 'doctors') {
         pinColor = '#F59E0B'; // Amber for doctors
-        badgeLabel = 'Doctor';
       }
 
       return `
@@ -244,14 +240,17 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
       }
     });
 
+    map.invalidateSize();
     if (filteredHospitals.length > 0) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    } else {
+      map.setView([lat, lng], 13);
     }
   }, [filteredHospitals, lat, lng]);
 
   const handleFocusHospital = (hosp) => {
     setSelectedHospital(hosp);
-    if (hosp.latitude && hosp.longitude && mapInstanceRef.current && window.L) {
+    if (hosp.latitude && hosp.longitude && mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([hosp.latitude, hosp.longitude], 15, { duration: 1.2 });
       const marker = hospitalMarkersRef.current[hosp.name];
       if (marker) {
@@ -282,13 +281,6 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
 
       {/* Main Container Split Layout */}
       <div className="flex flex-grow flex-col lg:flex-row overflow-hidden relative">
-        {loading ? (
-          <div className="absolute inset-0 z-50 bg-white flex flex-col justify-center items-center gap-4">
-            <Loader2 className="w-8 h-8 text-[#E07A5F] animate-spin" />
-            <span className="text-slate-600 font-bold text-sm">{t('searching_facilities')}</span>
-          </div>
-        ) : null}
-
         {mapError ? (
           <div className="absolute inset-0 z-50 bg-white flex flex-col justify-center items-center p-6 text-center">
             <MapPin className="w-12 h-12 text-red-500 mb-4" />
@@ -302,15 +294,23 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
           
           {/* Header & Refresh */}
           <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-              {t('facilities_found')} ({filteredHospitals.length})
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                {t('facilities_found')} ({filteredHospitals.length})
+              </span>
+              {isFetching && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-full">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Updating...
+                </span>
+              )}
+            </div>
             <button 
-              onClick={loadFacilities}
+              onClick={() => fetchFacilities(true)}
               className="p-1.5 rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors"
               title={t('refresh_listings')}
+              disabled={isFetching}
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin text-[#E07A5F]' : ''}`} />
             </button>
           </div>
 
@@ -352,7 +352,7 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
               onClick={() => setActiveFilter('doctors')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                 activeFilter === 'doctors' 
-                  ? 'bg-amber-600 text-white shadow-sm' 
+                  ? 'bg-[#0A2540] text-white shadow-sm' 
                   : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200/80'
               }`}
             >
@@ -363,7 +363,12 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
 
           {/* Facility List Cards */}
           <div className="p-4 overflow-y-auto space-y-3 flex-grow">
-            {filteredHospitals.length === 0 ? (
+            {initialLoading && hospitals.length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500 text-sm">
+                <Loader2 className="w-7 h-7 text-[#E07A5F] animate-spin" />
+                <span className="font-bold">{t('searching_facilities')}</span>
+              </div>
+            ) : filteredHospitals.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-sm">
                 {t('no_facilities_found')}
               </div>
@@ -432,8 +437,8 @@ export default function HospitalsMap({ userCoords, userLocationName, onBack }) {
         </div>
 
         {/* Right Side: Leaflet Map Container */}
-        <div className="flex-grow h-1/2 lg:h-full relative bg-slate-50">
-          <div ref={mapContainerRef} className="w-full h-full z-10" />
+        <div className="flex-grow h-1/2 lg:h-full relative bg-slate-50 min-h-[350px]">
+          <div ref={mapContainerRef} className="w-full h-full min-h-[350px] z-10" />
         </div>
       </div>
     </div>

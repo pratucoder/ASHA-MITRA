@@ -98,6 +98,7 @@ export const translations = {
     alert_suffix: "Alert",
 
     // HospitalsMap
+    locate_healthcare_title: "Locate Nearby Healthcare",
     locate_nearby: "Locate Nearby Healthcare",
     gps_center: "Active GPS Center",
     area: "Area",
@@ -290,6 +291,7 @@ export const translations = {
     alert_suffix: "अलर्ट",
 
     // HospitalsMap
+    locate_healthcare_title: "निकटतम स्वास्थ्य केंद्र खोजें",
     locate_nearby: "निकटतम स्वास्थ्य केंद्र खोजें",
     gps_center: "सक्रिय जीपीएस केंद्र",
     area: "क्षेत्र",
@@ -482,6 +484,7 @@ export const translations = {
     alert_suffix: "अलर्ट",
 
     // HospitalsMap
+    locate_healthcare_title: "जवळचे आरोग्य केंद्र शोधा",
     locate_nearby: "जवळचे आरोग्य केंद्र शोधा",
     gps_center: "सक्रिय जीपीएस केंद्र",
     area: "क्षेत्र",

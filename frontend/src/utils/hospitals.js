@@ -166,10 +166,11 @@ export async function reverseGeocode(lat, lng) {
 /**
  * Fetch real-world nearby hospitals, clinics, PHCs, CHCs, dispensaries and doctors from OpenStreetMap Overpass API
  */
+/**
+ * Fetch real-world nearby hospitals, clinics, PHCs, CHCs, dispensaries and doctors from OpenStreetMap Overpass API
+ */
 export async function fetchNearbyHospitalsOverpass(lat, lng) {
-  try {
-    // Comprehensive Overpass Query searching nodes, ways, and relations for clinics, hospitals, doctors, healthcare centers
-    const query = `[out:json][timeout:25];
+  const query = `[out:json][timeout:20];
 (
   nwr["amenity"="hospital"](around:25000,${lat},${lng});
   nwr["amenity"="clinic"](around:25000,${lat},${lng});
@@ -181,14 +182,27 @@ export async function fetchNearbyHospitalsOverpass(lat, lng) {
   nwr["healthcare"="dispensary"](around:25000,${lat},${lng});
 );
 out center;`;
-    const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-    if (!response.ok) throw new Error('Overpass API query failed');
-    const data = await response.json();
-    return data.elements || [];
-  } catch (error) {
-    console.error("Failed to fetch real medical facilities from Overpass:", error);
-    return [];
+
+  const endpoints = [
+    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+    `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`,
+    `https://overpass.private.coffee/api/interpreter?data=${encodeURIComponent(query)}`
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.elements) return data.elements;
+      }
+    } catch (err) {
+      console.warn(`Overpass endpoint request failed (${url}):`, err.message);
+    }
   }
+
+  console.error("All Overpass API mirrors failed to return facilities.");
+  return [];
 }
 
 /**
@@ -197,11 +211,12 @@ out center;`;
  */
 export async function getNearbyHospitalsAsync(lat, lng, villageName) {
   let startLat = 23.8000;
-  let startLng = 80.3500; // default
+  let startLng = 80.3500; // default Katni/Rampur
+  const hasGps = Boolean(lat && lng);
 
   let fetchedList = [];
 
-  if (lat && lng) {
+  if (hasGps) {
     startLat = lat;
     startLng = lng;
 
@@ -268,25 +283,41 @@ export async function getNearbyHospitalsAsync(lat, lng, villageName) {
     }
   }
 
-  // Combine fallback regional list with live fetched list
+  // Deduplicate and process facility map
   const combinedMap = new Map();
 
-  // Add regional defaults
-  REGIONAL_HOSPITALS.forEach(hosp => {
-    const coords = NODE_COORDINATES[hosp.name] || { latitude: 23.8000, longitude: 80.3500 };
-    combinedMap.set(hosp.name.toLowerCase(), {
-      ...hosp,
-      latitude: coords.latitude,
-      longitude: coords.longitude
+  // If live GPS results were fetched, use them as primary dataset
+  if (fetchedList.length > 0) {
+    fetchedList.forEach(item => {
+      combinedMap.set(item.name.toLowerCase(), item);
     });
-  });
 
-  // Add live fetched overpass facilities (overriding or supplementing)
-  fetchedList.forEach(item => {
-    combinedMap.set(item.name.toLowerCase(), item);
-  });
+    // Only include fallback regional hospitals if they are actually nearby (<= 30km)
+    REGIONAL_HOSPITALS.forEach(hosp => {
+      const coords = NODE_COORDINATES[hosp.name] || { latitude: 23.8000, longitude: 80.3500 };
+      const dist = getHaversineDistance(startLat, startLng, coords.latitude, coords.longitude);
+      if (dist <= 30) {
+        combinedMap.set(hosp.name.toLowerCase(), {
+          ...hosp,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        });
+      }
+    });
+  } else {
+    // If live GPS search returned empty or offline, use regional list
+    REGIONAL_HOSPITALS.forEach(hosp => {
+      const coords = NODE_COORDINATES[hosp.name] || { latitude: 23.8000, longitude: 80.3500 };
+      combinedMap.set(hosp.name.toLowerCase(), {
+        ...hosp,
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      });
+    });
+  }
 
-  const results = Array.from(combinedMap.values()).map(hosp => {
+  // Calculate exact distances from user coordinates
+  let results = Array.from(combinedMap.values()).map(hosp => {
     const dist = getHaversineDistance(startLat, startLng, hosp.latitude, hosp.longitude);
     return {
       ...hosp,
@@ -294,5 +325,17 @@ export async function getNearbyHospitalsAsync(lat, lng, villageName) {
     };
   });
 
-  return results.sort((a, b) => a.distance - b.distance);
+  // Sort by distance ascending
+  results.sort((a, b) => a.distance - b.distance);
+
+  // If user GPS is active, strictly filter out any facilities further than 35km radius
+  if (hasGps) {
+    const nearbyOnly = results.filter(h => h.distance <= 35);
+    if (nearbyOnly.length > 0) {
+      results = nearbyOnly;
+    }
+  }
+
+  // Return top 60 nearest facilities to prevent map overcrowding
+  return results.slice(0, 60);
 }
